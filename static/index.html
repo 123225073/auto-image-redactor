@@ -1168,7 +1168,7 @@
         </div>
         <div class="doc-grid">
           <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
-          <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。</p></div>
+          <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。物料编码、BOM 号、单据号、凭证号、订单号这类业务编号默认不打码。</p></div>
           <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
           <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
           <div class="doc-card"><strong>什么时候用 CPA</strong><p>本地规则不确定时，在右上角“设置”里打开 CPA。它只发送 OCR 文字行，不上传整张截图。</p></div>
@@ -1239,7 +1239,7 @@
           <label class="radio-card"><input type="radio" name="matchMode" value="fuzzy" checked> 模糊包含</label>
           <label class="radio-card"><input type="radio" name="matchMode" value="exact"> 精确短语</label>
         </div>
-        <p class="hint">请用中文逗号、英文逗号或换行隔开。模糊包含：只要图片文字里包含“XXX公司”，或 OCR 有轻微错字，也尽量命中。精确短语：必须出现你填写的完整短语。</p>
+        <p class="hint">请用中文逗号、英文逗号或换行隔开。模糊包含：只要图片文字里包含“XXX公司”，或 OCR 有轻微错字，也尽量命中。精确短语：必须出现你填写的完整短语。普通物料编码、BOM 组件号、单据号、凭证号、订单号、批次号默认不打码；确实要打码时，请把具体编号写进敏感词。</p>
         <label class="toggle"><input id="enhanceWithPrompt" type="checkbox"> 根据行业提示词增强识别</label>
         <div id="industryPromptPicker" class="prompt-picker hidden">
           <label for="industryPromptMainSelect">选择行业提示词</label>

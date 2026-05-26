@@ -110,10 +110,63 @@ SAP_CHROME_KEYWORDS = {
 DEFAULT_PATTERNS = [
     re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"),
     re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)"),
-    re.compile(r"(?<!\d)(?:\+?86[-\s]?)?(?:0\d{2,3}[-\s]?)?\d{7,8}(?!\d)"),
-    re.compile(r"\b[0-9A-Z]{18}\b"),
-    re.compile(r"(?<!\d)\d{12,19}(?!\d)"),
+    re.compile(r"(?<!\d)\d{6}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)"),
+    re.compile(r"(?<![0-9A-Z])[159Y][1239]\d{6}[0-9A-Z]{9}[0-9X](?![0-9A-Z])", re.IGNORECASE),
 ]
+
+BUSINESS_IDENTIFIER_KEYWORDS = {
+    "物料",
+    "物料号",
+    "物料编码",
+    "对象标识",
+    "对象",
+    "BOM",
+    "组件",
+    "单据",
+    "单据号",
+    "凭证",
+    "凭证号",
+    "订单",
+    "订单号",
+    "采购订单",
+    "销售订单",
+    "项目",
+    "行项目",
+    "批次",
+    "批号",
+    "层级",
+    "层",
+    "工厂",
+    "数量",
+    "金额",
+    "库存",
+    "库位",
+    "CS03",
+    "CS15",
+    "MM03",
+    "ME23N",
+}
+
+NUMERIC_SENSITIVE_LABEL_KEYWORDS = {
+    "账号",
+    "账户",
+    "银行账号",
+    "银行账户",
+    "银行卡",
+    "卡号",
+    "密码",
+    "口令",
+    "登录名",
+    "用户名",
+    "用户ID",
+    "手机号",
+    "手机",
+    "电话",
+    "身份证",
+    "证件号",
+    "税号",
+    "统一社会信用代码",
+}
 
 MARKDOWN_IMAGE_RE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<target>[^)\n]+)\)")
 HTML_IMG_QUOTED_RE = re.compile(
@@ -375,6 +428,10 @@ def compact_text(text: str) -> str:
     return re.sub(r"[\s:：,，;；、|｜\-\[\]【】（）()\u3000]+", "", text or "").strip()
 
 
+def compact_alnum(text: str) -> str:
+    return re.sub(r"[^0-9A-Za-z]", "", text or "").strip()
+
+
 def matched_terms(text: str, terms: Iterable[str]) -> list[str]:
     matches: list[str] = []
     lowered = text.lower()
@@ -405,6 +462,22 @@ def matched_terms(text: str, terms: Iterable[str]) -> list[str]:
 
 def clean_term(term: str) -> str:
     return compact_text(re.sub(r"^(?:exact|fuzzy):", "", term, flags=re.IGNORECASE))
+
+
+def user_terms_only(terms: Iterable[str]) -> list[str]:
+    default_keys = {compact_text(item).lower() for item in DEFAULT_TERMS}
+    custom: list[str] = []
+    for term in terms:
+        if not term or term.startswith("#") or term.startswith("re:"):
+            continue
+        cleaned = clean_term(term).lower()
+        if cleaned and cleaned not in default_keys:
+            custom.append(term)
+    return custom
+
+
+def explicit_user_term_matches(text: str, terms: Iterable[str]) -> bool:
+    return term_matches(text, user_terms_only(terms))
 
 
 def is_standard_label_text(text: str) -> bool:
@@ -443,6 +516,8 @@ def matched_only_standard_labels(text: str, terms: Iterable[str]) -> bool:
 
 def is_sensitive_field_label(text: str) -> bool:
     compact = compact_text(text)
+    if any(compact_text(keyword) in compact for keyword in NUMERIC_SENSITIVE_LABEL_KEYWORDS):
+        return True
     return compact in {
         compact_text(item)
         for item in (
@@ -466,8 +541,100 @@ def is_sensitive_field_label(text: str) -> bool:
             "账户",
             "SAP账号",
             "SAP账户",
+            "密码",
+            "登录密码",
+            "用户名",
+            "用户ID",
+            "银行卡",
+            "卡号",
         )
     }
+
+
+def is_standalone_sensitive_pattern(text: str) -> bool:
+    return any(pattern.search(text) for pattern in DEFAULT_PATTERNS)
+
+
+def is_non_sensitive_business_identifier(text: str, terms: Iterable[str]) -> bool:
+    if explicit_user_term_matches(text, terms):
+        return False
+
+    compact = compact_text(text)
+    alnum = compact_alnum(compact)
+    if not alnum:
+        return False
+
+    has_long_number = bool(re.search(r"\d{5,}", compact))
+    has_business_keyword = any(compact_text(keyword).lower() in compact.lower() for keyword in BUSINESS_IDENTIFIER_KEYWORDS)
+    if has_business_keyword and has_long_number:
+        return True
+
+    # SAP material numbers, document numbers, BOM component IDs, vouchers and
+    # order numbers are often long pure digits. Do not redact them just because
+    # they happen to have the same length as a tax ID or identity number.
+    if re.fullmatch(r"\d{12,20}", alnum):
+        return True
+
+    if is_standalone_sensitive_pattern(text):
+        return False
+
+    if re.fullmatch(r"\d{6,20}", alnum):
+        return True
+
+    return False
+
+
+def is_contextual_sensitive_value(text: str, label_text: str) -> bool:
+    compact = compact_text(text)
+    alnum = compact_alnum(compact)
+    if not compact or is_standard_label_text(text) or is_sap_chrome_text(text):
+        return False
+
+    label = compact_text(label_text)
+    if any(compact_text(keyword) in label for keyword in BUSINESS_IDENTIFIER_KEYWORDS):
+        return False
+
+    if any(keyword in label for keyword in ("手机", "电话")):
+        return bool(re.search(r"(?<!\d)1[3-9]\d{9}(?!\d)", text) or re.search(r"(?<!\d)(?:0\d{2,3}[-\s]?)?\d{7,8}(?!\d)", text))
+
+    if any(keyword in label for keyword in ("身份证", "证件号")):
+        return bool(re.search(r"(?<!\d)\d{6}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)", text))
+
+    if any(keyword in label for keyword in ("税号", "统一社会信用代码")):
+        return bool(re.fullmatch(r"[0-9A-Za-z]{15,20}", alnum))
+
+    if any(keyword in label for keyword in ("银行账号", "银行账户", "银行卡", "卡号")):
+        return bool(re.fullmatch(r"\d{8,24}", alnum))
+
+    if any(keyword in label for keyword in ("密码", "口令")):
+        return len(compact) >= 3
+
+    if any(keyword in label for keyword in ("账号", "账户", "登录名", "用户名", "用户ID", "SAP账号", "SAP账户")):
+        return bool(re.search(r"[A-Za-z]", alnum) or re.fullmatch(r"\d{4,24}", alnum))
+
+    if any(keyword in label for keyword in ("公司", "供应商", "客户", "联系人", "姓名", "地址", "开户行")):
+        if re.fullmatch(r"\d+", alnum):
+            return False
+        return bool(re.search(r"[\u4e00-\u9fff]{2,}", compact) or re.search(r"[A-Za-z]{2,}", compact))
+
+    return False
+
+
+def has_sensitive_neighbor_context(box: OcrBox, boxes: list[OcrBox]) -> bool:
+    x1, y1, _, y2 = box.bbox
+    center_y = (y1 + y2) / 2
+    height = max(1, y2 - y1)
+    for label in boxes:
+        if label.id == box.id or not is_sensitive_field_label(label.text):
+            continue
+        lx1, ly1, lx2, ly2 = label.bbox
+        label_center_y = (ly1 + ly2) / 2
+        same_row = abs(center_y - label_center_y) <= max(18, height * 0.9, (ly2 - ly1) * 0.9)
+        nearby_right = x1 >= lx2 - 8 and x1 <= lx2 + 420
+        label_inside_same_box = label.id == box.id or compact_text(label.text) in compact_text(box.text)
+        if (same_row and nearby_right or label_inside_same_box) and is_contextual_sensitive_value(box.text, label.text):
+            return True
+    return False
 
 
 def looks_like_field_value(text: str) -> bool:
@@ -493,6 +660,8 @@ def filter_standard_mask_ids(boxes: list[OcrBox], mask_ids: set[int], terms: Ite
         if is_standard_label_text(box.text):
             continue
         if matched_only_standard_labels(box.text, terms) and not pattern_matches(box.text):
+            continue
+        if is_non_sensitive_business_identifier(box.text, terms) and not has_sensitive_neighbor_context(box, boxes):
             continue
         filtered.add(box.id)
     return filtered
@@ -520,7 +689,7 @@ def fuzzy_contains(text: str, needle: str) -> bool:
 
 
 def pattern_matches(text: str) -> bool:
-    return any(pattern.search(text) for pattern in DEFAULT_PATTERNS)
+    return is_standalone_sensitive_pattern(text)
 
 
 def find_local_mask_ids(boxes: list[OcrBox], terms: list[str], mask_all_text: bool) -> set[int]:
@@ -533,13 +702,18 @@ def find_local_mask_ids(boxes: list[OcrBox], terms: list[str], mask_all_text: bo
     for box in boxes:
         if not box.text:
             continue
+        if is_sensitive_field_label(box.text):
+            label_boxes.append(box)
+            if is_contextual_sensitive_value(box.text, box.text):
+                mask_ids.add(box.id)
+                continue
         if is_sap_chrome_text(box.text) or is_standard_label_text(box.text):
-            if is_sensitive_field_label(box.text):
-                label_boxes.append(box)
             continue
         term_hit = term_matches(box.text, terms)
         pattern_hit = pattern_matches(box.text)
         if term_hit and matched_only_standard_labels(box.text, terms) and not pattern_hit:
+            continue
+        if not term_hit and is_non_sensitive_business_identifier(box.text, terms):
             continue
         if term_hit or pattern_hit:
             mask_ids.add(box.id)
@@ -555,7 +729,7 @@ def find_local_mask_ids(boxes: list[OcrBox], terms: list[str], mask_all_text: bo
         for box in boxes:
             if box.id in mask_ids:
                 continue
-            if not looks_like_field_value(box.text):
+            if not is_contextual_sensitive_value(box.text, label.text):
                 continue
             x1, y1, x2, y2 = box.bbox
             center_y = (y1 + y2) / 2
@@ -615,7 +789,9 @@ def cpa_classify_mask_ids(
         "敏感信息包括：公司名称、供应商名称、客户名称、人员姓名、手机号、邮箱、地址、税号、银行账号、SAP 登录账号、内部组织/公司代码，以及能定位具体公司或个人的信息。",
         "普通菜单名、按钮名、字段标签、系统标准术语如果没有暴露具体实体，不要打码；如果标签和具体值在同一行，或者旁边就是具体值，要选择真正暴露实体的行。",
         "SAP GUI 顶部菜单、事务栏、状态栏、系统环境名、窗口标题、按钮文本、页签名、字段标签本身通常不是敏感信息，不要因为出现“公司”“供应商”“客户”“账号”等字段名就打码。",
-        "例如“公司代码”“供应商”“客户”“资产”“子编号”“事务类型”“帐面折旧”“行项目”“抬头数据更改”等只是 SAP 标准字段/菜单时，不要选择；只有右侧/同一行的真实公司、供应商、客户、人员、账号、编号等业务主数据才选择。",
+        "物料编码、物料号、BOM 组件号、单据号、凭证号、订单号、项目号、行项目号、批次、数量、层级、工厂代码、CS03/CS15 查询结果等业务编号通常不要打码，除非用户额外敏感词明确指定它们。",
+        "纯数字或普通业务编码不要仅凭长度打码；只有手机号、身份证、税号、银行卡/银行账号、登录账号、密码等安全或个人信息才应选择。",
+        "例如“公司代码”“供应商”“客户”“资产”“子编号”“事务类型”“帐面折旧”“行项目”“抬头数据更改”等只是 SAP 标准字段/菜单时，不要选择；只有右侧/同一行的真实公司、供应商、客户、人员、账号、密码、税号、银行卡等敏感值才选择。",
         f"用户额外指定的脱敏词为：{json.dumps(user_terms, ensure_ascii=False)}。",
         f"匹配模式为：{match_mode}。fuzzy 表示包含、近似或 OCR 有轻微错字也应命中；exact 表示必须出现指定短语。",
     ]
