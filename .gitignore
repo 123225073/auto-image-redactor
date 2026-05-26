@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local runtime data
+runs/
+output/
+test-results/
+web-tool.*.log
+*.log
+*.zip
+
+# Local private configuration and prompts
+.env
+.env.*
+industry_prompts/
+industry_prompts.json
+sensitive_terms.txt
+
+# User documents and private samples
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

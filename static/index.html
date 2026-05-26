@@ -1,0 +1,2380 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSDN 图片脱敏发布助手</title>
+  <style>
+    :root {
+      --paper: #eef3f8;
+      --ink: #101828;
+      --subtle: #667085;
+      --panel: #ffffff;
+      --line: #d7dde8;
+      --deep: #07111f;
+      --blue: #246bfe;
+      --cyan: #11b8d8;
+      --green: #12a66a;
+      --amber: #bc7a12;
+      --red: #c7332b;
+      --mint: #dff7ec;
+      --blue-soft: #eaf1ff;
+      --shadow: 0 20px 58px rgba(16, 24, 40, .12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(17,184,216,.05) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(36,107,254,.04) 1px, transparent 1px),
+        var(--paper);
+      background-size: 36px 36px;
+      color: var(--ink);
+      font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    header {
+      background:
+        linear-gradient(120deg, rgba(17,184,216,.18), transparent 38%),
+        linear-gradient(90deg, #07111f, #0b1728 62%, #111827);
+      color: #fff;
+      padding: 22px 28px 18px;
+      border-bottom: 4px solid transparent;
+      border-image: linear-gradient(90deg, var(--green), var(--cyan), var(--blue)) 1;
+      box-shadow: 0 16px 34px rgba(7, 17, 31, .22);
+    }
+    .title-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.2;
+      font-weight: 800;
+    }
+    header p {
+      margin: 7px 0 0;
+      color: #c9d3e5;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .badge {
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 999px;
+      padding: 7px 11px;
+      color: #e9f4ff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .header-actions button {
+      min-height: 34px;
+      border-color: rgba(255,255,255,.24);
+      background: rgba(255,255,255,.08);
+      color: #fff;
+    }
+    .header-actions button:hover {
+      background: rgba(255,255,255,.14);
+    }
+
+    main {
+      width: min(1760px, calc(100vw - 32px));
+      margin: 18px auto 36px;
+      display: grid;
+      grid-template-columns: 460px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .step {
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      position: relative;
+    }
+    .step::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 20px;
+      bottom: 20px;
+      width: 3px;
+      background: linear-gradient(var(--cyan), var(--green));
+      opacity: .55;
+      border-radius: 999px;
+    }
+    .step:last-child { border-bottom: 0; }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 17px;
+      line-height: 1.35;
+    }
+    h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+    label {
+      display: block;
+      margin: 12px 0 7px;
+      color: #536174;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+      padding: 10px 11px;
+      outline: none;
+    }
+    textarea {
+      min-height: 118px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(36, 107, 254, .13);
+    }
+    .hint {
+      margin: 8px 0 0;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mode-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 9px;
+    }
+    .radio-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+    }
+    .toggle {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-top: 13px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .toggle input, .radio-card input { width: 16px; height: 16px; margin-top: 1px; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button, .button-link {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      min-height: 38px;
+      padding: 10px 13px;
+      background: var(--blue);
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    button:hover, .button-link:hover { transform: translateY(-1px); }
+    button.secondary, .button-link.secondary {
+      color: var(--ink);
+      background: #fff;
+      border-color: var(--line);
+    }
+    button.ghost { background: #102033; border-color: rgba(255,255,255,.2); }
+    button.green { background: var(--green); }
+    button.amber { background: var(--amber); }
+    button:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+    .drop {
+      border: 1px dashed #9ca9bd;
+      border-radius: 8px;
+      background: #f9fbff;
+      min-height: 118px;
+      padding: 18px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--subtle);
+      font-size: 13px;
+    }
+    .drop strong { color: var(--ink); }
+    .drop span {
+      display: block;
+      margin: 4px 0 8px;
+      color: var(--subtle);
+      line-height: 1.45;
+    }
+    .account-console {
+      margin-top: 14px;
+      border: 1px solid rgba(36,107,254,.18);
+      border-radius: 10px;
+      background: linear-gradient(180deg, #f8fbff, #ffffff);
+      padding: 12px;
+    }
+    .account-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .account-title {
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .account-state {
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .mini-grid label {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 8px;
+      background: #fff;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .auth-link {
+      margin-top: 10px;
+      border: 1px solid #b9e9f2;
+      background: #edfbfe;
+      color: #0c6274;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+    .auth-link a { color: #075985; font-weight: 900; }
+    .status {
+      margin-top: 14px;
+      border: 1px solid #bdd7ff;
+      background: #edf5ff;
+      color: #164477;
+      border-radius: 7px;
+      padding: 12px 13px;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .status.ok {
+      border-color: #afe4c8;
+      background: #edf9f3;
+      color: #12613f;
+    }
+    .status.error {
+      border-color: #ffd0c9;
+      background: #fff2ef;
+      color: var(--red);
+    }
+    .progress-log {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0f172a;
+      color: #d9e7ff;
+      max-height: 220px;
+      overflow: auto;
+      padding: 10px 12px;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .log-line {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      overflow-wrap: anywhere;
+    }
+    .log-line:last-child { border-bottom: 0; }
+    .log-line.error { color: #ffb4a9; }
+    .log-line.ok { color: #9ef3bf; }
+    .log-time {
+      color: #8ba3c7;
+      margin-right: 7px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 12px 14px 0;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+    }
+    .tab {
+      background: #fff;
+      color: var(--subtle);
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      min-height: 36px;
+      padding: 8px 12px;
+    }
+    .tab.active {
+      color: var(--ink);
+      background: #fff;
+    }
+    .workspace {
+      padding: 16px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pill {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .preview, .source {
+      min-height: 520px;
+      max-height: 680px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 18px;
+      line-height: 1.7;
+    }
+    .preview img {
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #e2e7f0;
+      border-radius: 4px;
+    }
+    .source {
+      width: 100%;
+      resize: vertical;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .audit-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+      gap: 12px;
+    }
+    .audit-summary {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 2px;
+    }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+    }
+    .metric strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+    }
+    .metric span {
+      display: block;
+      margin-top: 4px;
+      color: var(--subtle);
+      font-size: 12px;
+    }
+    .audit-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+      transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+    }
+    .audit-card.selected {
+      border-color: rgba(36,107,254,.72);
+      box-shadow: 0 0 0 3px rgba(36,107,254,.13), 0 16px 40px rgba(16,24,40,.13);
+    }
+    .audit-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(36,107,254,.35);
+      box-shadow: 0 14px 34px rgba(16,24,40,.12);
+    }
+    .audit-images {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-bottom: 1px solid var(--line);
+      background: #f6f8fb;
+    }
+    .image-pane {
+      min-width: 0;
+      border-right: 1px solid var(--line);
+      position: relative;
+      cursor: pointer;
+    }
+    .image-pane:last-child { border-right: 0; }
+    .image-pane.active {
+      box-shadow: inset 0 0 0 3px rgba(36,107,254,.42);
+      background: #eef5ff;
+    }
+    .image-pane span {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: rgba(7,17,31,.74);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      z-index: 1;
+    }
+    .image-pane .empty-img {
+      height: 158px;
+      display: grid;
+      place-items: center;
+      color: var(--subtle);
+      font-size: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .audit-card img {
+      width: 100%;
+      height: 158px;
+      object-fit: contain;
+      background: #f6f8fb;
+      cursor: zoom-in;
+    }
+    .audit-body {
+      padding: 12px;
+    }
+    .audit-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .count {
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: var(--blue-soft);
+      color: #1246a0;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .count.hit {
+      background: var(--mint);
+      color: #0b6b42;
+    }
+    .match-list {
+      display: grid;
+      gap: 6px;
+    }
+    .audit-ref {
+      margin: 0 0 8px;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .match {
+      border: 1px solid #f0d49b;
+      background: #fff8e8;
+      color: #7b4a00;
+      border-radius: 7px;
+      padding: 6px 8px;
+      font-size: 12px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .match::before {
+      content: "打码 ";
+      color: #9a5b00;
+      font-weight: 900;
+    }
+    .empty {
+      color: var(--subtle);
+      font-size: 13px;
+      padding: 20px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .hidden { display: none; }
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      background: rgba(12, 20, 36, .42);
+      z-index: 20;
+    }
+    .drawer-backdrop.open { display: block; }
+    .settings-drawer {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      right: auto;
+      width: min(1180px, calc(100vw - 56px));
+      height: min(90vh, 920px);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 28px 82px rgba(16, 24, 40, .28);
+      z-index: 21;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .settings-drawer.open {
+      display: flex;
+      animation: modalIn .18s ease both;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translate(-50%, -47%) scale(.98); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    .drawer-head {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .drawer-head h2 { margin: 0; }
+    .drawer-body {
+      padding: 18px 20px 24px;
+      overflow: auto;
+    }
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    .settings-block {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: linear-gradient(180deg, #fff, #f8fbff);
+    }
+    .settings-block.full { grid-column: 1 / -1; }
+    .settings-block h3 {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 12px;
+      font-size: 15px;
+    }
+    .section-index {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 7px;
+      color: #075985;
+      background: #eaf7fb;
+      border: 1px solid #b9e9f2;
+      font-size: 13px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+    .label-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 12px 0 7px;
+    }
+    .label-row label {
+      margin: 0;
+    }
+    .info-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid #9bbcff;
+      background: #f5f8ff;
+      color: #174ea6;
+      font-size: 8px;
+      font-weight: 900;
+      line-height: 10px;
+      padding: 0;
+      min-height: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+    }
+    .info-dot:hover {
+      transform: none;
+      box-shadow: 0 0 0 3px rgba(36, 107, 254, .12);
+    }
+    .advanced-box {
+      margin-top: 10px;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+    .advanced-box summary {
+      cursor: pointer;
+      color: #174ea6;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .inline-state {
+      margin-top: 10px;
+      border: 1px solid #dce7f8;
+      background: #f7fbff;
+      border-radius: 8px;
+      padding: 10px;
+      color: #36516f;
+      font-size: 12px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+    .prompt-manager textarea {
+      min-height: 150px;
+    }
+    .prompt-picker {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #cfe3ff;
+      border-radius: 8px;
+      background: #f5f9ff;
+    }
+    .rerun-box {
+      margin-top: 10px;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+    .rerun-source {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .rerun-source label {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .rerun-box textarea {
+      min-height: 64px;
+      font-size: 13px;
+    }
+    .audit-card.busy {
+      opacity: .68;
+      pointer-events: none;
+    }
+    .copy-warning {
+      margin-top: 10px;
+      border: 1px solid #f3d59c;
+      background: #fff8e7;
+      color: #7b4a00;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .settings-status {
+      margin: 0 20px 12px;
+      border: 1px solid #bdd7ff;
+      background: #edf5ff;
+      color: #164477;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.55;
+      display: none;
+      white-space: pre-wrap;
+    }
+    .settings-status.show { display: block; }
+    .settings-status.ok {
+      border-color: #afe4c8;
+      background: #edf9f3;
+      color: #12613f;
+    }
+    .settings-status.error {
+      border-color: #ffd0c9;
+      background: #fff2ef;
+      color: var(--red);
+    }
+    .import-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 4px 0 14px;
+    }
+    .source-tab {
+      min-height: 40px;
+      background: #fff;
+      color: var(--subtle);
+      border-color: var(--line);
+    }
+    .source-tab.active {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(36,107,254,.22);
+    }
+    .import-pane.hidden { display: none; }
+    .stream-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 0;
+    }
+    .stream-state {
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .help-drawer {
+      width: min(980px, 100vw);
+    }
+    .help-hero {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      display: block;
+      cursor: zoom-in;
+      margin-bottom: 16px;
+    }
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .doc-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: linear-gradient(180deg, #fff, #f8fbff);
+    }
+    .doc-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .doc-card p {
+      margin: 0;
+      color: var(--subtle);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .flow-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0;
+    }
+    .flow-step {
+      border: 1px solid #cfe3ff;
+      border-radius: 9px;
+      padding: 10px;
+      background: #f2f7ff;
+      color: #15325b;
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+    }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(7, 17, 31, .82);
+      z-index: 30;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox-panel {
+      width: min(1200px, 96vw);
+      max-height: 94vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+    }
+    .lightbox-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      font-weight: 900;
+    }
+    .lightbox img {
+      width: 100%;
+      max-height: calc(94vh - 58px);
+      object-fit: contain;
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .info-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(7, 17, 31, .64);
+      z-index: 32;
+    }
+    .info-modal.open { display: flex; }
+    .info-card {
+      width: min(560px, 96vw);
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 70px rgba(7,17,31,.25);
+      padding: 18px;
+    }
+    .info-card h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .info-card p {
+      margin: 0;
+      color: var(--subtle);
+      line-height: 1.75;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .info-card .actions {
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 1020px) {
+      main { grid-template-columns: 1fr; }
+      .title-row { align-items: flex-start; flex-direction: column; }
+      .header-actions { justify-content: flex-start; }
+    }
+    @media (max-width: 720px) {
+      .audit-summary { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      .mini-grid { grid-template-columns: 1fr; }
+      .doc-grid { grid-template-columns: 1fr; }
+      .flow-strip { grid-template-columns: 1fr; }
+      .settings-grid { grid-template-columns: 1fr; }
+      .settings-block.full { grid-column: auto; }
+      .lightbox { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-row">
+      <div>
+        <h1>CSDN 图片脱敏发布助手</h1>
+        <p>飞书链接、本地 Word/PDF/Markdown 进入，自动识别截图敏感文字，生成可发布的安全草稿。</p>
+      </div>
+      <div class="header-actions">
+        <div class="badge">本地优先 · CPA 可选 · 发布前人工确认</div>
+        <button id="helpBtn" type="button">使用文档</button>
+        <button id="settingsBtn" type="button">设置</button>
+        <button id="clearCacheBtn" type="button">清空缓存</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+  <aside id="settingsDrawer" class="settings-drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <h2>设置</h2>
+        <p class="hint">这些设置只保存在当前页面会话里，刷新不丢，关闭页面后自动清空。每个功能区可以单独保存。</p>
+      </div>
+      <button class="secondary" id="closeSettingsBtn" type="button">关闭</button>
+    </div>
+    <div id="settingsStatus" class="settings-status"></div>
+    <form id="settingsForm" class="drawer-body settings-grid" autocomplete="off">
+      <section class="settings-block">
+        <h3><span class="section-index">一</span>CPA 大模型配置 <button class="info-dot" type="button" data-info-title="CPA 大模型" data-info="这里用于连接你的 CPA 反代理 API。不开启时，工具只用本地 OCR 和本地规则；开启后，只把 OCR 识别出的文字行发给模型判断，不上传整张截图。">!</button></h3>
+        <label class="toggle"><input id="useCpa" type="checkbox"> 使用 CPA 辅助判断哪些 OCR 文字需要打码</label>
+        <div class="label-row"><label for="apiKey">CPA API Key</label><button class="info-dot" type="button" data-info-title="CPA API Key" data-info="填写 CPA 反代理的 Key，例如 sk-xxxx。这个 Key 只保存在当前页面会话里，刷新页面不丢，关闭页面后清空。">!</button></div>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off">
+        <div class="label-row"><label for="baseUrl">Base URL</label><button class="info-dot" type="button" data-info-title="Base URL" data-info="CPA 接口地址，默认是 https://cpa.fengsha.online/v1。除非你换了反代理地址，否则不用改。">!</button></div>
+        <input id="baseUrl" type="text" value="https://cpa.fengsha.online/v1">
+        <div class="row">
+          <div>
+            <div class="label-row"><label for="modelSelect">模型</label><button class="info-dot" type="button" data-info-title="模型下拉框" data-info="点击“获取模型”后，这里会显示 CPA 当前能用的模型。选择一个即可。">!</button></div>
+            <select id="modelSelect">
+              <option value="gpt-5.5">gpt-5.5</option>
+            </select>
+          </div>
+          <div>
+            <div class="label-row"><label for="modelManual">手动模型名</label><button class="info-dot" type="button" data-info-title="手动模型名" data-info="如果下拉框没有你想用的模型，可以在这里直接填写模型名称。">!</button></div>
+            <input id="modelManual" type="text" value="gpt-5.5">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="secondary" id="fetchModelsBtn" type="button">获取模型</button>
+          <button class="amber" id="testCpaBtn" type="button">测试连接</button>
+          <button class="green" id="saveCpaBtn" type="button">保存 CPA 配置</button>
+        </div>
+        <p class="hint">先填写 Key，再点“获取模型”或“测试连接”。行业提示词增强识别需要 CPA。</p>
+      </section>
+
+      <section class="settings-block">
+        <h3><span class="section-index">二</span>飞书账号授权 <button class="info-dot" type="button" data-info-title="飞书账号" data-info="这里管理 lark-cli 的飞书授权。CLI 不能强制指定企业账号；如果授权页只显示个人飞书，请把授权链接复制到已登录企业飞书的浏览器或无痕窗口打开。">!</button></h3>
+        <div id="larkAccountState" class="inline-state">尚未检查。切换账号时不需要密码，只需要在飞书授权页选择账号。</div>
+        <div class="actions">
+          <button class="secondary" id="checkLarkAccountBtn" type="button">检查当前飞书身份</button>
+          <button class="secondary" id="listLarkUsersBtn" type="button">查看已授权账号</button>
+          <button class="secondary" id="listProfilesBtn" type="button">高级：读取身份槽位</button>
+        </div>
+        <div class="label-row"><label for="profileSelect">高级：飞书身份槽位</label><button class="info-dot" type="button" data-info-title="飞书身份槽位" data-info="这是 lark-cli 的工作身份配置，不等于普通意义上的飞书账号。一般不用动；只有你明确知道哪个身份能读取企业文档时，才需要切换。">!</button></div>
+        <div class="row">
+          <select id="profileSelect"><option value="">先读取身份槽位</option></select>
+          <button class="amber" id="useProfileBtn" type="button">使用这个身份读取文档</button>
+        </div>
+        <details class="advanced-box">
+          <summary>高级权限设置（通常不用展开）</summary>
+          <label>默认授权内容</label>
+          <div class="mini-grid">
+            <label><input class="auth-domain" type="checkbox" value="docs" checked> 文档</label>
+            <label><input class="auth-domain" type="checkbox" value="wiki" checked> 知识库</label>
+            <label><input class="auth-domain" type="checkbox" value="drive" checked> 云空间</label>
+          </div>
+          <div class="label-row"><label for="authScope">高级权限编号</label><button class="info-dot" type="button" data-info-title="高级权限编号" data-info="这是飞书接口权限编号。普通情况留空即可；只有飞书报错明确提示缺少某个权限编号时，再复制到这里。">!</button></div>
+          <input id="authScope" type="text" placeholder="一般留空；例如 docx:document:readonly">
+        </details>
+        <div class="actions">
+          <button class="green" id="startLarkLoginBtn" type="button">授权一个飞书账号</button>
+          <button class="secondary" id="completeLarkLoginBtn" type="button">我已经点完授权</button>
+          <button class="secondary" id="saveLarkBtn" type="button">保存飞书设置</button>
+        </div>
+        <div id="authLinkBox" class="auth-link hidden"></div>
+      </section>
+
+      <section class="settings-block prompt-manager">
+        <h3><span class="section-index">三</span>行业提示词 <button class="info-dot" type="button" data-info-title="行业提示词" data-info="行业提示词用于告诉 AI：哪些是你行业里真正要打码的数据，哪些只是系统标准字段。比如 SAP 里“供应商”可能只是字段名，不一定要打码。">!</button></h3>
+        <div class="label-row"><label for="promptPath">提示词存放路径</label><button class="info-dot" type="button" data-info-title="提示词存放路径" data-info="可以指定一个本地文件夹。工具会自动读取里面的 txt、md、json 文件，一个文件就是一个行业提示词。">!</button></div>
+        <input id="promptPath" type="text" placeholder="例如 D:\prompts\privacy">
+        <div class="actions">
+          <button class="secondary" id="loadPromptsBtn" type="button">加载提示词</button>
+          <button class="amber" id="savePromptPathBtn" type="button">保存路径</button>
+        </div>
+        <div class="row">
+          <div>
+            <div class="label-row"><label for="promptName">提示词名称</label><button class="info-dot" type="button" data-info-title="提示词名称" data-info="例如：SAP系统截图、财务凭证、采购合同。保存后会出现在主页面下拉框里。">!</button></div>
+            <input id="promptName" type="text" placeholder="SAP系统截图">
+          </div>
+          <div>
+            <div class="label-row"><label for="industryPromptSelect">已保存提示词</label><button class="info-dot" type="button" data-info-title="已保存提示词" data-info="这里选择一个已保存的行业提示词。主页面启用增强识别后，也会用同一个列表。">!</button></div>
+            <select id="industryPromptSelect"><option value="">先加载提示词</option></select>
+          </div>
+        </div>
+        <div class="label-row"><label for="promptContent">提示词内容</label><button class="info-dot" type="button" data-info-title="提示词内容" data-info="用大白话写清楚：什么要打码，什么不要打码。比如 SAP 标准字段名不要打码，真实供应商名称、客户名称、公司名称要打码。">!</button></div>
+        <textarea id="promptContent" placeholder="写清楚这个行业里哪些内容是真正敏感，哪些只是标准字段或菜单。"></textarea>
+        <div class="actions">
+          <button class="green" id="savePromptBtn" type="button">保存提示词</button>
+        </div>
+      </section>
+
+      <section class="settings-block">
+        <h3><span class="section-index">四</span>CSDN 发布 <button class="info-dot" type="button" data-info-title="CSDN 发布" data-info="优先使用 CSDN 自己的图片上传通道，把本地脱敏后的图片上传成 CSDN 图片地址，再复制文章。这样不会依赖你自己的 COS 存储桶。">!</button></h3>
+        <div class="label-row"><label for="csdnCookie">CSDN Cookie（可选）</label><button class="info-dot" type="button" data-info-title="CSDN Cookie" data-info="如果你填写 CSDN 登录 Cookie，点击“复制富文本并打开 CSDN”时会先把图片上传到 CSDN 官方图片服务，再复制文章。你可以先点“打开 CSDN 登录页”，登录后点“尝试自动读取 Cookie”；如果浏览器加密拦截，再按下方手动引导复制。">!</button></div>
+        <textarea id="csdnCookie" placeholder="可选。填写后使用 CSDN 原生图片上传；不填写则仍可复制草稿，但 CSDN 可能无法自动转存本地图片。"></textarea>
+        <div class="actions">
+          <button class="secondary" id="openCsdnLoginBtn" type="button">打开 CSDN 登录页</button>
+          <button class="amber" id="readCsdnCookieBtn" type="button">尝试自动读取 Cookie</button>
+          <button class="green" id="saveCsdnBtn" type="button">保存 CSDN 设置</button>
+        </div>
+        <details class="advanced-box">
+          <summary>如果自动读取失败，点这里看获取方法</summary>
+          <p class="hint">推荐流程：1. 点“打开 CSDN 登录页”；2. 登录成功后回到本工具；3. 点“尝试自动读取 Cookie”。如果仍失败，可以在 CSDN 页面按 F12，进入 Console，输入 <code>document.cookie</code>，复制返回内容粘贴到上方。</p>
+        </details>
+        <p class="hint">最终发布按钮仍然由你在 CSDN 页面人工确认。本工具不会自动公开发布。</p>
+      </section>
+    </form>
+  </aside>
+
+  <aside id="helpDrawer" class="settings-drawer help-drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div>
+        <h2>使用文档</h2>
+        <p class="hint">给新手看的 5 步说明：导入、设置规则、检查图片、复制发布。</p>
+      </div>
+      <button class="secondary" id="closeHelpBtn" type="button">关闭</button>
+    </div>
+    <div class="drawer-body">
+      <img id="helpHeroImg" class="help-hero" src="/static/assets/help-privacy-flow.png" alt="飞书文档和本地文件经过 OCR 脱敏后生成 CSDN 安全草稿的流程示意图">
+      <div class="flow-strip">
+        <div class="flow-step">1 导入文章</div>
+        <div class="flow-step">2 填敏感词</div>
+        <div class="flow-step">3 开始脱敏</div>
+        <div class="flow-step">4 检查图片</div>
+        <div class="flow-step">5 发布前确认</div>
+      </div>
+      <div class="doc-grid">
+        <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
+        <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。</p></div>
+        <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
+        <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
+        <div class="doc-card"><strong>什么时候用 CPA</strong><p>本地规则不确定时，在右上角“设置”里打开 CPA。它只发送 OCR 文字行，不上传整张截图。</p></div>
+        <div class="doc-card"><strong>怎么发到 CSDN</strong><p>确认图片检查和预览无误后，点击“复制富文本并打开 CSDN”。如已在设置里填写 CSDN Cookie，工具会先走 CSDN 原生图片上传，最终发布按钮仍由你人工确认。</p></div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <section class="panel">
+      <div class="step">
+        <h2>1. 导入文章</h2>
+        <div class="import-tabs" role="tablist" aria-label="导入方式">
+          <button class="source-tab active" type="button" data-source-tab="lark">飞书链接</button>
+          <button class="source-tab" type="button" data-source-tab="upload">本地文件</button>
+        </div>
+        <div id="larkImportPane" class="import-pane">
+          <label for="docUrl">飞书文档链接</label>
+          <input id="docUrl" type="text" placeholder="粘贴 docx/wiki 链接，工具会自动调用本机 lark-cli">
+          <div class="actions">
+            <button id="processLarkBtn">读取并脱敏</button>
+            <button class="secondary" id="healthBtn">检查飞书 CLI</button>
+          </div>
+          <p class="hint">不需要你另开命令行；后台会自动调用 lark-cli。如果飞书授权过期，会在这里显示明确提示。</p>
+          <div id="larkQuickState" class="inline-state">飞书账号授权、企业账号选择、高级权限都已移到右上角“设置 → 飞书账号”。</div>
+        </div>
+        <div id="uploadImportPane" class="import-pane hidden">
+          <div class="drop">
+            <div>
+              <strong>选择文章或图片文件</strong>
+              <span>支持 Markdown、HTML、Word、PDF、图片</span>
+              <input id="files" type="file" multiple accept=".md,.markdown,.html,.htm,.doc,.docx,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif,.txt">
+            </div>
+          </div>
+          <div class="actions">
+            <button id="processUploadBtn">上传并脱敏</button>
+          </div>
+          <p class="hint">一篇文章几十张图也可以处理；右侧会逐张列出“哪张图、命中什么文字、打码几处”。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <h2>2. 运行进度</h2>
+        <div id="status" class="status">等待处理。</div>
+        <div class="stream-controls">
+          <button class="amber" id="pauseStreamBtn" type="button" disabled>暂停</button>
+          <span id="streamState" class="stream-state">处理开始后，可以暂停在下一张图片前继续。</span>
+        </div>
+        <div id="progressLog" class="progress-log" aria-live="polite">
+          <div class="log-line"><span class="log-time">--:--:--</span>等待开始。每一步都会在这里显示。</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <h2>3. 脱敏规则</h2>
+        <label for="terms">额外敏感词</label>
+        <textarea id="terms" placeholder="默认已包含：赛邦、乐土、纯米、xxx公司、xxx股份有限公司。这里可继续补充，例如：&#10;ABC供应商，CM1165，张三"></textarea>
+        <div class="mode-row">
+          <label class="radio-card"><input type="radio" name="matchMode" value="fuzzy" checked> 模糊包含</label>
+          <label class="radio-card"><input type="radio" name="matchMode" value="exact"> 精确短语</label>
+        </div>
+        <p class="hint">请用中文逗号、英文逗号或换行隔开。模糊包含：只要图片文字里包含“XXX公司”，或 OCR 有轻微错字，也尽量命中。精确短语：必须出现你填写的完整短语。</p>
+        <label class="toggle"><input id="enhanceWithPrompt" type="checkbox"> 根据行业提示词增强识别</label>
+        <div id="industryPromptPicker" class="prompt-picker hidden">
+          <label for="industryPromptMainSelect">选择行业提示词</label>
+          <select id="industryPromptMainSelect"><option value="">请先在设置里加载或保存提示词</option></select>
+          <p class="hint">开启后会先按脱敏规则找候选，再结合行业提示词判断哪些是真正需要打码的数据，减少 SAP 标准字段误伤。</p>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="audit">图片检查</button>
+        <button class="tab" data-tab="preview">预览</button>
+        <button class="tab" data-tab="source">安全草稿</button>
+        <button class="tab" data-tab="report">报告</button>
+      </div>
+      <div class="workspace">
+        <div class="meta" id="meta"></div>
+        <div id="audit" class="audit-grid"><div class="empty">处理完成后，这里会逐张显示图片、命中数量和被打码的 OCR 文字。</div></div>
+        <div id="preview" class="preview hidden">这里会显示安全版文章预览。</div>
+        <textarea id="source" class="source hidden" readonly></textarea>
+        <textarea id="report" class="source hidden" readonly></textarea>
+        <div class="actions">
+          <button class="green" id="copyRichBtn" disabled>复制富文本并打开 CSDN</button>
+          <button class="secondary" id="copyMdBtn" disabled>复制安全草稿</button>
+          <a class="button-link secondary" id="downloadBtn" href="#" download>下载安全包</a>
+        </div>
+        <p class="hint">CSDN 最终发布按钮由你确认。发布前建议先看“图片检查”和“报告”。</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="imageLightbox" class="lightbox" aria-hidden="true">
+    <div class="lightbox-panel">
+      <div class="lightbox-top">
+        <span id="lightboxTitle">图片预览</span>
+        <button class="secondary" id="closeLightboxBtn" type="button">关闭</button>
+      </div>
+      <img id="lightboxImage" src="" alt="放大查看的图片">
+    </div>
+  </div>
+
+  <div id="infoModal" class="info-modal" aria-hidden="true">
+    <div class="info-card">
+      <h3 id="infoModalTitle">说明</h3>
+      <p id="infoModalText"></p>
+      <div class="actions">
+        <button class="secondary" id="closeInfoModalBtn" type="button">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const CACHE_KEY = "csdnSafeToolSession.v2";
+    const state = {
+      result: null,
+      activeTab: "audit",
+      activeImportTab: "lark",
+      logs: [],
+      larkDeviceCode: "",
+      prompts: [],
+      streamingJobId: "",
+      streamingImages: [],
+      streamingTotal: 0,
+      isProcessing: false,
+      isPaused: false,
+      selectedAudit: { index: null, source: "original" },
+      renderVersion: Date.now()
+    };
+
+    function selectedMatchMode() {
+      return document.querySelector("input[name='matchMode']:checked")?.value || "fuzzy";
+    }
+
+    function selectedModel() {
+      return $("modelManual").value.trim() || $("modelSelect").value || "gpt-5.5";
+    }
+
+    function options() {
+      return {
+        terms: $("terms").value,
+        matchMode: selectedMatchMode(),
+        mode: ($("useCpa").checked || $("enhanceWithPrompt").checked) ? "cpa" : "local",
+        apiKey: $("apiKey").value,
+        baseUrl: $("baseUrl").value || "https://cpa.fengsha.online/v1",
+        model: selectedModel(),
+        enhanceWithPrompt: $("enhanceWithPrompt").checked,
+        industryPromptId: $("industryPromptMainSelect").value || $("industryPromptSelect").value || ""
+      };
+    }
+
+    function cacheSnapshot() {
+      return {
+        docUrl: $("docUrl").value,
+        terms: $("terms").value,
+        matchMode: selectedMatchMode(),
+        enhanceWithPrompt: $("enhanceWithPrompt").checked,
+        industryPromptId: $("industryPromptMainSelect").value,
+        useCpa: $("useCpa").checked,
+        apiKey: $("apiKey").value,
+        baseUrl: $("baseUrl").value,
+        modelManual: $("modelManual").value,
+        modelOptions: Array.from($("modelSelect").options).map(option => option.value),
+        csdnCookie: $("csdnCookie").value,
+        promptPath: $("promptPath").value,
+        promptName: $("promptName").value,
+        promptContent: $("promptContent").value,
+        authScope: $("authScope").value,
+        authDomains: Array.from(document.querySelectorAll(".auth-domain:checked")).map(item => item.value),
+        larkDeviceCode: state.larkDeviceCode,
+        activeTab: state.activeTab,
+        activeImportTab: state.activeImportTab,
+        selectedAudit: state.selectedAudit,
+        lastJobId: state.result?.jobId || "",
+        logs: state.logs.slice(-80)
+      };
+    }
+
+    function saveCache() {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheSnapshot()));
+      } catch {
+        // Session storage can be full for very large browser sessions. The tool still works without cache.
+      }
+    }
+
+    function applyCachedInputs(cache) {
+      if (!cache) return;
+      $("docUrl").value = cache.docUrl || "";
+      $("terms").value = cache.terms || "";
+      $("enhanceWithPrompt").checked = !!cache.enhanceWithPrompt;
+      $("useCpa").checked = !!cache.useCpa;
+      $("apiKey").value = cache.apiKey || "";
+      $("baseUrl").value = cache.baseUrl || "https://cpa.fengsha.online/v1";
+      $("modelManual").value = cache.modelManual || "gpt-5.5";
+      $("csdnCookie").value = cache.csdnCookie || "";
+      $("promptPath").value = cache.promptPath || "";
+      $("promptName").value = cache.promptName || "";
+      $("promptContent").value = cache.promptContent || "";
+      if (Array.isArray(cache.modelOptions) && cache.modelOptions.length) {
+        $("modelSelect").innerHTML = cache.modelOptions.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
+      }
+      if (cache.modelManual && !Array.from($("modelSelect").options).some(option => option.value === cache.modelManual)) {
+        $("modelSelect").insertAdjacentHTML("afterbegin", `<option value="${escapeHtml(cache.modelManual)}">${escapeHtml(cache.modelManual)}</option>`);
+      }
+      const mode = cache.matchMode || "fuzzy";
+      const radio = document.querySelector(`input[name="matchMode"][value="${mode}"]`);
+      if (radio) radio.checked = true;
+      if (cache.industryPromptId) {
+        $("industryPromptMainSelect").innerHTML = `<option value="${escapeHtml(cache.industryPromptId)}">${escapeHtml(cache.industryPromptId)}</option>`;
+        $("industryPromptMainSelect").value = cache.industryPromptId;
+      }
+      $("authScope").value = cache.authScope || "";
+      if (Array.isArray(cache.authDomains) && cache.authDomains.length) {
+        document.querySelectorAll(".auth-domain").forEach(item => item.checked = cache.authDomains.includes(item.value));
+      }
+      state.larkDeviceCode = cache.larkDeviceCode || "";
+      if (cache.selectedAudit) state.selectedAudit = cache.selectedAudit;
+      state.logs = Array.isArray(cache.logs) ? cache.logs : [];
+      renderLog();
+      switchImportTab(cache.activeImportTab || "lark", { cache: false });
+    }
+
+    async function restoreCachedResult(cache) {
+      if (!cache?.lastJobId) return;
+      try {
+        addLog("正在恢复刷新前的处理结果。");
+        const res = await fetch(`/api/jobs/${cache.lastJobId}/result`);
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "恢复失败");
+        renderResult(data, { restoreTab: cache.activeTab || "audit", cache: false });
+        setStatus("已恢复刷新前的处理结果。", "ok");
+        addLog("刷新前结果已恢复。", "ok");
+      } catch (err) {
+        setStatus(`缓存恢复失败：${err.message || err}`, "error");
+        addLog(`缓存恢复失败：${err.message || err}`, "error");
+      }
+    }
+
+    function clearSessionCache() {
+      sessionStorage.removeItem(CACHE_KEY);
+      state.result = null;
+      state.logs = [];
+      state.streamingJobId = "";
+      state.streamingImages = [];
+      state.streamingTotal = 0;
+      state.isProcessing = false;
+      state.isPaused = false;
+      state.selectedAudit = { index: null, source: "original" };
+      updateStreamControls();
+      $("docUrl").value = "";
+      $("files").value = "";
+      $("terms").value = "";
+      $("enhanceWithPrompt").checked = false;
+      $("industryPromptPicker").classList.add("hidden");
+      $("industryPromptMainSelect").innerHTML = `<option value="">请先在设置里加载或保存提示词</option>`;
+      $("useCpa").checked = false;
+      $("apiKey").value = "";
+      $("baseUrl").value = "https://cpa.fengsha.online/v1";
+      $("modelSelect").innerHTML = `<option value="gpt-5.5">gpt-5.5</option>`;
+      $("modelManual").value = "gpt-5.5";
+      $("csdnCookie").value = "";
+      $("promptPath").value = "";
+      $("promptName").value = "";
+      $("promptContent").value = "";
+      $("industryPromptSelect").innerHTML = `<option value="">先加载提示词</option>`;
+      $("authScope").value = "";
+      document.querySelectorAll(".auth-domain").forEach(item => item.checked = true);
+      state.larkDeviceCode = "";
+      $("authLinkBox").classList.add("hidden");
+      $("authLinkBox").innerHTML = "";
+      $("larkAccountState").textContent = "尚未检查。切换账号时不需要密码，只需要在飞书授权页选择账号。";
+      $("larkQuickState").textContent = "飞书账号授权、企业账号选择、高级权限都已移到右上角“设置 → 飞书账号”。";
+      $("profileSelect").innerHTML = `<option value="">先读取身份槽位</option>`;
+      document.querySelector('input[name="matchMode"][value="fuzzy"]').checked = true;
+      switchImportTab("lark", { cache: false });
+      $("meta").innerHTML = "";
+      $("audit").innerHTML = `<div class="empty">处理完成后，这里会逐张显示图片、命中数量和被打码的 OCR 文字。</div>`;
+      $("preview").innerHTML = "这里会显示安全版文章预览。";
+      $("source").value = "";
+      $("report").value = "";
+      $("downloadBtn").href = "#";
+      $("copyRichBtn").disabled = true;
+      $("copyMdBtn").disabled = true;
+      setStatus("缓存已清空。", "ok");
+      addLog("缓存已清空。", "ok");
+      switchTab("audit");
+    }
+
+    function setStatus(text, type = "") {
+      const el = $("status");
+      el.textContent = text;
+      el.className = "status" + (type ? " " + type : "");
+    }
+
+    function setSettingsStatus(text, type = "") {
+      const el = $("settingsStatus");
+      if (!el) return;
+      el.textContent = text;
+      el.className = "settings-status show" + (type ? " " + type : "");
+    }
+
+    function setBusy(isBusy) {
+      [
+        "processLarkBtn", "processUploadBtn", "healthBtn", "fetchModelsBtn", "testCpaBtn", "clearCacheBtn",
+        "checkLarkAccountBtn", "listLarkUsersBtn", "listProfilesBtn", "useProfileBtn", "startLarkLoginBtn", "completeLarkLoginBtn",
+        "loadPromptsBtn", "savePromptPathBtn", "savePromptBtn", "saveCpaBtn", "saveLarkBtn", "saveCsdnBtn",
+        "openCsdnLoginBtn", "readCsdnCookieBtn"
+      ].forEach(id => {
+        const el = $(id);
+        if (el) el.disabled = isBusy;
+      });
+      ["copyRichBtn", "copyMdBtn"].forEach(id => {
+        const el = $(id);
+        if (el) el.disabled = isBusy || !state.result;
+      });
+      document.querySelectorAll(".source-tab").forEach(btn => btn.disabled = isBusy);
+      updateStreamControls();
+    }
+
+    function updateStreamControls() {
+      const button = $("pauseStreamBtn");
+      const label = $("streamState");
+      if (!button || !label) return;
+      button.disabled = !state.isProcessing || !state.streamingJobId;
+      button.textContent = state.isPaused ? "继续" : "暂停";
+      label.textContent = state.isProcessing
+        ? state.isPaused
+          ? "任务已暂停，点击“继续”后从下一张图片前接着跑。"
+          : "正在处理。点击“暂停”会在当前图片处理完后停在下一张图前。"
+        : "处理开始后，可以暂停在下一张图片前继续。";
+    }
+
+    function addLog(message, type = "progress", time = null) {
+      state.logs.push({ message, type, time: time || new Date().toLocaleTimeString("zh-CN", { hour12: false }) });
+      state.logs = state.logs.slice(-120);
+      renderLog();
+      saveCache();
+    }
+
+    function renderLog() {
+      const logs = state.logs.length ? state.logs : [{ message: "等待开始。每一步都会在这里显示。", type: "", time: "--:--:--" }];
+      $("progressLog").innerHTML = logs.map(item => {
+        const cls = item.type === "error" ? " error" : item.type === "done" || item.type === "ok" ? " ok" : "";
+        return `<div class="log-line${cls}"><span class="log-time">${escapeHtml(item.time || "")}</span>${escapeHtml(item.message || "")}</div>`;
+      }).join("");
+      $("progressLog").scrollTop = $("progressLog").scrollHeight;
+    }
+
+    function openSettings() {
+      $("settingsDrawer").classList.add("open");
+      $("drawerBackdrop").classList.add("open");
+      $("settingsDrawer").setAttribute("aria-hidden", "false");
+    }
+
+    function closeSettings() {
+      $("settingsDrawer").classList.remove("open");
+      $("drawerBackdrop").classList.remove("open");
+      $("settingsDrawer").setAttribute("aria-hidden", "true");
+      saveCache();
+    }
+
+    function openHelp() {
+      $("helpDrawer").classList.add("open");
+      $("drawerBackdrop").classList.add("open");
+      $("helpDrawer").setAttribute("aria-hidden", "false");
+    }
+
+    function closeHelp() {
+      $("helpDrawer").classList.remove("open");
+      $("drawerBackdrop").classList.remove("open");
+      $("helpDrawer").setAttribute("aria-hidden", "true");
+    }
+
+    function closeDrawers() {
+      closeSettings();
+      closeHelp();
+    }
+
+    function openLightbox(src, title) {
+      $("lightboxImage").src = src;
+      $("lightboxTitle").textContent = title || "图片预览";
+      $("imageLightbox").classList.add("open");
+      $("imageLightbox").setAttribute("aria-hidden", "false");
+    }
+
+    function closeLightbox() {
+      $("imageLightbox").classList.remove("open");
+      $("imageLightbox").setAttribute("aria-hidden", "true");
+      $("lightboxImage").src = "";
+    }
+
+    function openInfo(title, text) {
+      $("infoModalTitle").textContent = title || "说明";
+      $("infoModalText").textContent = text || "";
+      $("infoModal").classList.add("open");
+      $("infoModal").setAttribute("aria-hidden", "false");
+    }
+
+    function closeInfo() {
+      $("infoModal").classList.remove("open");
+      $("infoModal").setAttribute("aria-hidden", "true");
+    }
+
+    function syncPromptPicker() {
+      $("industryPromptPicker").classList.toggle("hidden", !$("enhanceWithPrompt").checked);
+      if ($("enhanceWithPrompt").checked && !$("useCpa").checked) {
+        $("useCpa").checked = true;
+      }
+      saveCache();
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+
+    async function readJsonResponse(res) {
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        return { ok: false, error: text || `HTTP ${res.status}` };
+      }
+    }
+
+    async function apiJson(url, options = {}) {
+      const res = await fetch(url, options);
+      const data = await readJsonResponse(res);
+      if (!res.ok || !data.ok) throw new Error(data.error || "请求失败");
+      return data;
+    }
+
+    function saveSettings() {
+      saveCache();
+      setSettingsStatus("设置已保存。刷新页面不会丢，关闭页面后会自动清空。", "ok");
+    }
+
+    function saveCpaSettings() {
+      saveCache();
+      setSettingsStatus("CPA 大模型配置已保存。保存后不会关闭设置页，你可以继续配置其他功能。", "ok");
+    }
+
+    function saveLarkSettings() {
+      saveCache();
+      setSettingsStatus("飞书账号授权设置已保存。账号授权状态由 lark-cli 管理，这里会记住高级权限和身份选择信息。", "ok");
+    }
+
+    function saveCsdnSettings() {
+      saveCache();
+      const hasCookie = !!$("csdnCookie").value.trim();
+      setSettingsStatus(hasCookie
+        ? "CSDN Cookie 已保存。复制富文本时会优先把脱敏图片上传到 CSDN 官方图片服务。"
+        : "CSDN 设置已保存。当前未填写 Cookie，复制到 CSDN 后本地图片可能无法自动显示。",
+        hasCookie ? "ok" : "");
+    }
+
+    function openCsdnLogin() {
+      window.open("https://passport.csdn.net/login", "_blank", "noopener");
+      setSettingsStatus("已打开 CSDN 登录页。登录成功后回到这里点“尝试自动读取 Cookie”。", "ok");
+    }
+
+    async function readCsdnCookie() {
+      setBusy(true);
+      setSettingsStatus("正在尝试从本机 Chrome / Edge / Firefox 读取 CSDN Cookie...");
+      addLog("开始尝试自动读取 CSDN Cookie。");
+      try {
+        const data = await apiJson("/api/csdn/cookie");
+        $("csdnCookie").value = data.cookie || "";
+        saveCache();
+        setSettingsStatus(data.message || "已读取并填入 CSDN Cookie。", "ok");
+        addLog("CSDN Cookie 自动读取成功。", "ok");
+      } catch (err) {
+        setSettingsStatus(`自动读取失败：${err.message || err}\n可以先点“打开 CSDN 登录页”完成登录，再重试；仍失败时，展开下方手动引导复制 document.cookie。`, "error");
+        addLog(`CSDN Cookie 自动读取失败：${err.message || err}`, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function renderLarkStatus(status) {
+      const lines = [
+        `<strong>当前账号：</strong>${escapeHtml(status.userName || "未登录")}`,
+        `<strong>状态：</strong>${escapeHtml(status.tokenStatus || status.userStatus || "-")}`,
+        `<strong>身份：</strong>${escapeHtml(status.identity || status.defaultAs || "-")}`,
+        status.expiresAt ? `<strong>过期时间：</strong>${escapeHtml(status.expiresAt)}` : ""
+      ].filter(Boolean);
+      $("larkAccountState").innerHTML = lines.join("<br>");
+      $("larkQuickState").innerHTML = `当前飞书身份：<strong>${escapeHtml(status.userName || "未登录")}</strong>。账号切换在右上角“设置 → 飞书账号”。`;
+    }
+
+    async function checkLarkAccount() {
+      setBusy(true);
+      addLog("开始检查飞书当前账号。");
+      setSettingsStatus("正在检查当前飞书身份...");
+      try {
+        const data = await apiJson("/api/lark/auth/status?verify=1");
+        renderLarkStatus(data.status || {});
+        setSettingsStatus(`飞书账号可用：${data.status?.userName || "已登录"}`, "ok");
+        addLog(`飞书账号检查完成：${data.status?.userName || "已登录"}`, "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    async function listLarkUsers() {
+      setBusy(true);
+      addLog("开始读取已登录飞书账号列表。");
+      setSettingsStatus("正在读取已授权的飞书账号...");
+      try {
+        const data = await apiJson("/api/lark/auth/list");
+        const users = data.users || [];
+        $("larkAccountState").innerHTML = users.length
+          ? users.map(user => `${escapeHtml(user.userName || "-")} · ${escapeHtml(user.tokenStatus || "-")}`).join("<br>")
+          : "当前没有已登录的飞书用户。";
+        setSettingsStatus(`已读取 ${users.length} 个飞书账号。`, "ok");
+        addLog(`已读取 ${users.length} 个飞书账号。`, "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function listProfiles() {
+      setBusy(true);
+      addLog("开始读取飞书身份槽位。");
+      setSettingsStatus("正在读取飞书身份槽位...");
+      try {
+        const data = await apiJson("/api/lark/profile/list");
+        const profiles = data.profiles || [];
+        $("profileSelect").innerHTML = profiles.length
+          ? profiles.map(profile => `<option value="${escapeHtml(profile.name)}">${escapeHtml(profile.active ? "当前 · " : "")}${escapeHtml(profile.name)}${profile.user ? " · " + escapeHtml(profile.user) : ""}</option>`).join("")
+          : `<option value="">没有身份槽位</option>`;
+        setSettingsStatus(`已读取 ${profiles.length} 个飞书身份槽位。`, "ok");
+        addLog(`已读取 ${profiles.length} 个飞书身份槽位。`, "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    async function useProfile() {
+      const profile = $("profileSelect").value;
+      if (!profile) {
+        setSettingsStatus("请先读取并选择飞书身份槽位。", "error");
+        return;
+      }
+      if (!confirm(`确定使用这个飞书身份读取文档：${profile}？`)) return;
+      setBusy(true);
+      addLog(`开始切换飞书身份：${profile}`);
+      try {
+        const data = await apiJson("/api/lark/profile/use", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ profile })
+        });
+        setSettingsStatus(data.message || "飞书身份已切换。", "ok");
+        addLog(data.message || "飞书身份已切换。", "ok");
+        await checkLarkAccount();
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function startLarkLogin() {
+      const domains = Array.from(document.querySelectorAll(".auth-domain:checked")).map(item => item.value);
+      const scope = $("authScope").value.trim();
+      setBusy(true);
+      addLog("开始发起飞书授权。");
+      setSettingsStatus("正在发起飞书授权...");
+      try {
+        const data = await apiJson("/api/lark/auth/login/start", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ domains, scope })
+        });
+        const auth = data.auth || {};
+        const url = auth.verification_uri_complete || auth.verification_url || auth.verification_uri || auth.url || "";
+        state.larkDeviceCode = auth.device_code || auth.deviceCode || "";
+        $("authLinkBox").classList.remove("hidden");
+        $("authLinkBox").innerHTML = url
+          ? `请打开授权链接并选择要使用的飞书账号：<br><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a><br><br>如果这里只出现个人飞书，请复制这条链接，到已经登录企业飞书的浏览器或无痕窗口打开。完成后回到这里点“我已经点完授权”。`
+          : `授权已发起，但 CLI 没有返回链接。请查看运行进度。`;
+        setSettingsStatus("飞书授权已发起，请打开授权链接选择账号。", "ok");
+        addLog("飞书授权链接已生成。", "ok");
+        saveCache();
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function completeLarkLogin() {
+      if (!state.larkDeviceCode) {
+        setSettingsStatus("请先点击“授权一个飞书账号”发起授权。", "error");
+        return;
+      }
+      setBusy(true);
+      addLog("开始确认飞书授权结果。");
+      setSettingsStatus("正在确认飞书授权结果...");
+      try {
+        const data = await apiJson("/api/lark/auth/login/complete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ deviceCode: state.larkDeviceCode })
+        });
+        setSettingsStatus(data.message || "飞书授权完成。", "ok");
+        addLog(data.message || "飞书授权完成。", "ok");
+        state.larkDeviceCode = "";
+        $("authLinkBox").classList.add("hidden");
+        await checkLarkAccount();
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    function startStreamingAudit() {
+      state.result = null;
+      state.streamingImages = [];
+      state.streamingTotal = 0;
+      state.streamingJobId = "";
+      state.isPaused = false;
+      state.renderVersion = Date.now();
+      $("meta").innerHTML = `<span class="pill">处理中</span><span class="pill">逐图输出已开启</span>`;
+      renderAudit({ reportData: { images: [] } }, { streaming: true });
+      updateStreamControls();
+    }
+
+    function upsertStreamingImage(image) {
+      if (!image || !image.index) return;
+      image.jobId = image.jobId || state.streamingJobId;
+      const existing = state.streamingImages.findIndex(item => Number(item.index) === Number(image.index));
+      if (existing >= 0) state.streamingImages[existing] = { ...state.streamingImages[existing], ...image };
+      else state.streamingImages.push(image);
+      state.streamingImages.sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
+      renderAudit({ reportData: { images: state.streamingImages } }, { streaming: true });
+    }
+
+    function handleStreamEvent(event) {
+      const data = event.data || {};
+      if (event.type === "job_created") {
+        state.streamingJobId = data.jobId || state.streamingJobId;
+        updateStreamControls();
+      }
+      if (event.type === "scan_done") {
+        state.streamingTotal = Number(data.totalImages || 0);
+        renderAudit({ reportData: { images: state.streamingImages } }, { streaming: true });
+      }
+      if (event.type === "image_start") {
+        state.streamingJobId = data.jobId || state.streamingJobId;
+        state.streamingTotal = Number(data.total || state.streamingTotal || 0);
+        upsertStreamingImage({
+          index: data.index,
+          originalRef: data.originalRef || `图片 ${data.index}`,
+          status: "processing",
+          maskedRegions: 0,
+          matches: [],
+          jobId: state.streamingJobId
+        });
+      }
+      if (event.type === "image_done" || event.type === "image_failed") {
+        state.streamingJobId = data.jobId || state.streamingJobId;
+        state.streamingTotal = Number(data.total || state.streamingTotal || 0);
+        upsertStreamingImage(data.image);
+      }
+      if (event.type === "paused") {
+        state.isPaused = true;
+        updateStreamControls();
+      }
+      if (event.type === "resumed") {
+        state.isPaused = false;
+        updateStreamControls();
+      }
+    }
+
+    async function toggleStreamPause() {
+      if (!state.streamingJobId || !state.isProcessing) return;
+      const pausedNext = !state.isPaused;
+      try {
+        const endpoint = pausedNext ? "pause" : "resume";
+        const data = await apiJson(`/api/jobs/${state.streamingJobId}/${endpoint}`, { method: "POST" });
+        state.isPaused = pausedNext;
+        addLog(data.message || (pausedNext ? "任务已暂停。" : "任务已继续。"), pausedNext ? "progress" : "ok");
+        updateStreamControls();
+      } catch (err) {
+        addLog(err.message || String(err), "error");
+      }
+    }
+
+    async function readStreamResponse(res) {
+      if (!res.ok) {
+        const data = await readJsonResponse(res);
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      if (!res.body) throw new Error("当前浏览器不支持流式进度读取。");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let finalResult = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          const clean = line.trim();
+          if (!clean) continue;
+          const event = JSON.parse(clean);
+          handleStreamEvent(event);
+          addLog(event.message || "", event.type, event.time);
+          if (event.type === "error") throw new Error(event.message || "处理失败");
+          if (event.type === "done") {
+            finalResult = event.data?.result || null;
+          }
+        }
+        if (done) break;
+      }
+      if (buffer.trim()) {
+        const event = JSON.parse(buffer.trim());
+        handleStreamEvent(event);
+        addLog(event.message || "", event.type, event.time);
+        if (event.type === "error") throw new Error(event.message || "处理失败");
+        if (event.type === "done") finalResult = event.data?.result || null;
+      }
+      return finalResult;
+    }
+
+    async function runStream(url, fetchOptions, startMessage) {
+      setBusy(true);
+      state.isProcessing = true;
+      startStreamingAudit();
+      state.logs = [];
+      renderLog();
+      setStatus(startMessage);
+      addLog(startMessage);
+      saveCache();
+      try {
+        const res = await fetch(url, fetchOptions);
+        const result = await readStreamResponse(res);
+        if (!result?.ok) throw new Error("处理结束，但没有拿到结果。");
+        renderResult(result);
+        addLog("全流程结束。", "ok");
+      } catch (err) {
+        setStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        state.isProcessing = false;
+        state.isPaused = false;
+        updateStreamControls();
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    function assetUrl(src, jobId = null, version = null) {
+      if (!src || /^https?:|^data:/.test(src)) return src;
+      if (src.startsWith("/api/")) return src;
+      const id = jobId || state.result?.jobId || state.streamingJobId;
+      if (!id) return src;
+      const url = `/api/jobs/${id}/file/${src}`;
+      return version ? `${url}?v=${encodeURIComponent(version)}` : url;
+    }
+
+    function markdownPreview(md) {
+      let html = escapeHtml(md);
+      html = html.replace(/^### (.*)$/gm, "<h3>$1</h3>");
+      html = html.replace(/^## (.*)$/gm, "<h2>$1</h2>");
+      html = html.replace(/^# (.*)$/gm, "<h1>$1</h1>");
+      html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => {
+        const clean = src.replace(/^<|>$/g, "").split(/\s+["']/)[0];
+        return `<p><img src="${escapeHtml(assetUrl(clean))}" alt="${escapeHtml(alt)}"></p>`;
+      });
+      html = html.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
+      return `<p>${html}</p>`;
+    }
+
+    function htmlPreview(content) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = content;
+      wrapper.querySelectorAll("img").forEach(img => {
+        const src = img.getAttribute("src");
+        if (src) img.setAttribute("src", assetUrl(src));
+      });
+      return wrapper.innerHTML;
+    }
+
+    function renderAudit(result, opts = {}) {
+      const images = result.reportData?.images || [];
+      if (!images.length) {
+        $("audit").innerHTML = opts.streaming
+          ? `<div class="empty">正在等待第一张图片完成。处理过程中会一张一张显示在这里。</div>`
+          : `<div class="empty">没有在文章中发现图片。</div>`;
+        return;
+      }
+      const hitImages = images.filter(item => (item.maskedRegions || 0) > 0).length;
+      const totalMasks = images.reduce((sum, item) => sum + (item.maskedRegions || 0), 0);
+      const totalLabel = opts.streaming && state.streamingTotal ? state.streamingTotal : images.length;
+      const doneLabel = opts.streaming ? `${images.filter(item => item.status !== "processing").length}/${totalLabel}` : images.length;
+      const summary = `
+        <div class="audit-summary">
+          <div class="metric"><strong>${escapeHtml(doneLabel)}</strong><span>${opts.streaming ? "已输出 / 图片总数" : "图片总数"}</span></div>
+          <div class="metric"><strong>${hitImages}</strong><span>需要打码的图片</span></div>
+          <div class="metric"><strong>${totalMasks}</strong><span>打码区域总数</span></div>
+        </div>`;
+      const cards = images.map(item => {
+        const matches = item.matches || [];
+        const version = item.updatedAt || state.renderVersion;
+        const jobId = item.jobId || state.result?.jobId || state.streamingJobId;
+        const originalSrc = item.sourceImageRef ? assetUrl(item.sourceImageRef, jobId, version) : "";
+        const maskedSrc = item.outputRef ? assetUrl(item.outputRef, jobId, version) : "";
+        const selected = Number(state.selectedAudit.index) === Number(item.index);
+        const selectedSource = selected ? state.selectedAudit.source : "original";
+        const pane = (label, source, src) => `
+          <div class="image-pane ${selected && selectedSource === source ? "active" : ""}" data-select-source="${source}" data-index="${escapeHtml(item.index)}">
+            <span>${label}</span>
+            ${src
+              ? `<img class="audit-img" src="${escapeHtml(src)}" data-source="${source}" data-index="${escapeHtml(item.index)}" data-title="图片 ${item.index} · ${label}" alt="第 ${item.index} 张图片${label}，点击可放大">`
+              : `<div class="empty-img">${item.status === "processing" ? "处理中..." : "暂无图片"}</div>`}
+          </div>`;
+        const image = `<div class="audit-images">${pane("原图", "original", originalSrc)}${pane("打码图", "masked", maskedSrc)}</div>`;
+        const countClass = item.maskedRegions > 0 ? "count hit" : "count";
+        const matchHtml = matches.length
+          ? matches.map(match => `<span class="match">${escapeHtml(match.text)}</span>`).join("")
+          : `<span class="hint">未命中需要打码的文字</span>`;
+        const note = item.note ? `<p class="hint">单图要求：${escapeHtml(item.note)}</p>` : "";
+        const statusText = item.status === "processing" ? "处理中" : `${item.maskedRegions || 0} 处打码`;
+        return `
+          <article class="audit-card ${selected ? "selected" : ""}" data-image-index="${escapeHtml(item.index)}">
+            ${image}
+            <div class="audit-body">
+              <div class="audit-title">
+                <span>图片 ${item.index}</span>
+                <span class="${countClass}">${escapeHtml(statusText)}</span>
+              </div>
+              <p class="audit-ref">原图位置：${escapeHtml(item.originalRef || "-")}</p>
+              <h3>打码内容</h3>
+              <div class="match-list">${matchHtml}</div>
+              ${note}
+              <div class="rerun-box">
+                <div class="rerun-source">
+                  <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="original" ${selectedSource !== "masked" ? "checked" : ""}> 基于原图</label>
+                  <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="masked" ${selectedSource === "masked" ? "checked" : ""}> 基于打码图</label>
+                </div>
+                <textarea class="rerun-input" placeholder="可选：写这一张图的特殊要求，例如：这张图不需要打码；只打码供应商名称；不要打码 SAP 标准字段。"></textarea>
+                <div class="actions">
+                  <button class="secondary rerun-btn" type="button" data-index="${escapeHtml(item.index)}" ${item.status === "processing" || opts.streaming ? "disabled" : ""}>重新识别这张图</button>
+                </div>
+              </div>
+            </div>
+          </article>`;
+      }).join("");
+      $("audit").innerHTML = summary + cards;
+    }
+
+    function renderResult(result, opts = {}) {
+      state.result = result;
+      state.renderVersion = Date.now();
+      state.streamingJobId = result.jobId || state.streamingJobId;
+      $("meta").innerHTML = [
+        `<span class="pill">来源：${escapeHtml(result.source)}</span>`,
+        `<span class="pill">任务：${escapeHtml(result.jobId)}</span>`,
+        `<span class="pill">输出：${escapeHtml(result.outputFile)}</span>`
+      ].join("");
+      const isHtml = /\.html?$/i.test(result.outputFile);
+      $("preview").innerHTML = isHtml ? htmlPreview(result.content) : markdownPreview(result.content);
+      $("source").value = result.content;
+      $("report").value = result.report || "";
+      $("downloadBtn").href = result.downloadUrl;
+      $("copyRichBtn").disabled = false;
+      $("copyMdBtn").disabled = false;
+      renderAudit(result);
+      setStatus("处理完成。请先看右侧“图片检查”，确认命中内容是否正确。", "ok");
+      switchTab(opts.restoreTab || "audit");
+      if (opts.cache !== false) saveCache();
+    }
+
+    async function postJson(url, body) {
+      setBusy(true);
+      setStatus("正在处理，图片多的话会花一点时间...");
+      try {
+        const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "处理失败");
+        renderResult(data);
+      } catch (err) {
+        setStatus(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function rerunImage(index, instruction, imageSource = "original") {
+      if (!state.result?.jobId) return;
+      setBusy(true);
+      setStatus(`正在重新识别第 ${index} 张图片...`);
+      addLog(`开始重新识别第 ${index} 张图片，来源：${imageSource === "masked" ? "打码图" : "原图"}。`);
+      try {
+        const payload = { ...options(), imageInstruction: instruction || "", imageSource };
+        const data = await apiJson(`/api/jobs/${state.result.jobId}/images/${index}/rerun`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        state.renderVersion = Date.now();
+        renderResult(data, { restoreTab: "audit" });
+        setStatus(`第 ${index} 张图片已重新识别。`, "ok");
+        addLog(`第 ${index} 张图片已重新识别。`, "ok");
+      } catch (err) {
+        setStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    async function processLark() {
+      const docUrl = $("docUrl").value.trim();
+      if (!docUrl) {
+        setStatus("请先填写飞书文档链接。", "error");
+        addLog("请先填写飞书文档链接。", "error");
+        return;
+      }
+      saveCache();
+      await runStream(
+        "/api/process-lark-stream",
+        { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ docUrl, ...options() }) },
+        "开始读取飞书链接。"
+      );
+    }
+
+    async function processUpload() {
+      const files = $("files").files;
+      if (!files.length) {
+        setStatus("请先选择要上传的文件。", "error");
+        addLog("请先选择要上传的文件。", "error");
+        return;
+      }
+      const form = new FormData();
+      Array.from(files).forEach(file => form.append("files", file));
+      Object.entries(options()).forEach(([key, value]) => form.append(key, value));
+      saveCache();
+      await runStream("/api/process-upload-stream", { method: "POST", body: form }, "开始上传并脱敏。");
+    }
+
+    async function fetchModels() {
+      setBusy(true);
+      setSettingsStatus("正在获取 CPA 模型列表...");
+      addLog("开始获取 CPA 模型列表。");
+      try {
+        const res = await fetch("/api/cpa/models", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(options()) });
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "获取模型失败");
+        const models = data.models || [];
+        $("modelSelect").innerHTML = models.map(model => `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
+        if (models.length) $("modelManual").value = models[0];
+        setSettingsStatus(`模型获取成功，共 ${models.length} 个。`, "ok");
+        addLog(`模型获取成功，共 ${models.length} 个。`, "ok");
+        saveCache();
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function testCpa() {
+      setBusy(true);
+      setSettingsStatus("正在测试 CPA 连接...");
+      addLog("开始测试 CPA 连接。");
+      try {
+        const res = await fetch("/api/cpa/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(options()) });
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "测试失败");
+        setSettingsStatus(data.message || "CPA 连接成功。", "ok");
+        addLog(data.message || "CPA 连接成功。", "ok");
+        saveCache();
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function renderPrompts(prompts, path = "") {
+      state.prompts = prompts || [];
+      if (path) $("promptPath").value = path;
+      const selected = $("industryPromptMainSelect").value || $("industryPromptSelect").value;
+      const optionsHtml = state.prompts.length
+        ? state.prompts.map(prompt => `<option value="${escapeHtml(prompt.id)}">${escapeHtml(prompt.name || prompt.id)}</option>`).join("")
+        : `<option value="">暂无提示词</option>`;
+      $("industryPromptSelect").innerHTML = optionsHtml;
+      $("industryPromptMainSelect").innerHTML = optionsHtml;
+      if (selected && state.prompts.some(prompt => prompt.id === selected)) {
+        $("industryPromptSelect").value = selected;
+        $("industryPromptMainSelect").value = selected;
+      }
+      const first = state.prompts[0];
+      if (first) {
+        $("promptName").value = $("promptName").value || first.name || "";
+        if (!$("promptContent").value) $("promptContent").value = first.content || "";
+      }
+      syncPromptPicker();
+    }
+
+    async function loadPrompts() {
+      setBusy(true);
+      addLog("开始加载行业提示词。");
+      setSettingsStatus("正在加载行业提示词...");
+      try {
+        const data = await apiJson("/api/industry-prompts");
+        renderPrompts(data.prompts || [], data.path || "");
+        setSettingsStatus(`已加载 ${data.prompts?.length || 0} 个行业提示词。`, "ok");
+        addLog(`已加载 ${data.prompts?.length || 0} 个行业提示词。`, "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    async function savePromptPath() {
+      const path = $("promptPath").value.trim();
+      if (!path) {
+        setSettingsStatus("请先填写提示词存放路径。", "error");
+        return;
+      }
+      setBusy(true);
+      addLog("开始保存行业提示词路径。");
+      setSettingsStatus("正在保存行业提示词路径...");
+      try {
+        const data = await apiJson("/api/industry-prompts/path", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path })
+        });
+        renderPrompts(data.prompts || [], data.path || path);
+        setSettingsStatus("行业提示词路径已保存。", "ok");
+        addLog("行业提示词路径已保存。", "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    async function savePrompt() {
+      const name = $("promptName").value.trim();
+      const content = $("promptContent").value.trim();
+      if (!name || !content) {
+        setSettingsStatus("请填写提示词名称和内容。", "error");
+        return;
+      }
+      setBusy(true);
+      addLog(`开始保存行业提示词：${name}`);
+      setSettingsStatus("正在保存行业提示词...");
+      try {
+        const data = await apiJson("/api/industry-prompts/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name, content })
+        });
+        renderPrompts(data.prompts || [], $("promptPath").value);
+        const saved = (data.prompts || []).find(item => item.name === name || item.id === name || item.id === `${name}.md`);
+        if (saved) {
+          $("industryPromptSelect").value = saved.id;
+          $("industryPromptMainSelect").value = saved.id;
+        }
+        setSettingsStatus("行业提示词已保存。", "ok");
+        addLog("行业提示词已保存。", "ok");
+      } catch (err) {
+        setSettingsStatus(err.message || String(err), "error");
+        addLog(err.message || String(err), "error");
+      } finally {
+        setBusy(false);
+        saveCache();
+      }
+    }
+
+    function selectPrompt(id, syncMain = true) {
+      const prompt = state.prompts.find(item => item.id === id);
+      if (prompt) {
+        $("promptName").value = prompt.name || "";
+        $("promptContent").value = prompt.content || "";
+      }
+      if (syncMain) $("industryPromptMainSelect").value = id;
+      else $("industryPromptSelect").value = id;
+      saveCache();
+    }
+
+    async function copyPlain() {
+      if (!state.result) return;
+      await navigator.clipboard.writeText(state.result.content);
+      setStatus("安全草稿已复制。", "ok");
+    }
+
+    function resultHasLocalImages(result) {
+      return /(?:src=["']images\/|!\[[^\]]*\]\(images\/)/i.test(result?.content || "");
+    }
+
+    async function prepareCsdnNativeIfPossible() {
+      const cookie = $("csdnCookie").value.trim();
+      if (!state.result || !cookie || !resultHasLocalImages(state.result)) return state.result;
+      setStatus("正在把脱敏图片上传到 CSDN 官方图片服务...");
+      addLog("开始使用 CSDN 原生图片上传。");
+      const data = await apiJson(`/api/jobs/${state.result.jobId}/csdn/prepare`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cookie })
+      });
+      renderResult(data, { restoreTab: state.activeTab || "audit" });
+      addLog(`CSDN 原生图片上传完成：${data.csdnUploads?.length || 0} 张。`, "ok");
+      return data;
+    }
+
+    async function copyRichAndOpen() {
+      if (!state.result) return;
+      setBusy(true);
+      try {
+        const prepared = await prepareCsdnNativeIfPossible();
+        const htmlBlob = new Blob([prepared.clipboardHtml], { type: "text/html" });
+        const textBlob = new Blob([prepared.content], { type: "text/plain" });
+        await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
+        if (!$("csdnCookie").value.trim() && resultHasLocalImages(prepared)) {
+          setStatus("已复制草稿并打开 CSDN。提示：未填写 CSDN Cookie 时，CSDN 可能无法自动转存本地图片；建议在设置里填写 Cookie 后再点一次。", "ok");
+        } else {
+          setStatus("已复制带 CSDN 图片地址的草稿，正在打开 CSDN 创作页。最终发布由你确认。", "ok");
+        }
+      } catch (err) {
+        await navigator.clipboard.writeText(state.result.content);
+        setStatus(`CSDN 原生图片准备失败，已先复制安全草稿文本：${err.message || err}`, "error");
+        addLog(`CSDN 原生图片准备失败：${err.message || err}`, "error");
+      } finally {
+        setBusy(false);
+      }
+      window.open(state.result.editorUrl || "https://editor.csdn.net/md/", "_blank", "noopener");
+    }
+
+    function switchImportTab(name, opts = {}) {
+      const target = name === "upload" ? "upload" : "lark";
+      state.activeImportTab = target;
+      document.querySelectorAll(".source-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.sourceTab === target));
+      $("larkImportPane").classList.toggle("hidden", target !== "lark");
+      $("uploadImportPane").classList.toggle("hidden", target !== "upload");
+      if (opts.cache !== false) saveCache();
+    }
+
+    function selectAuditImage(index, source = "original") {
+      state.selectedAudit = { index: Number(index), source: source === "masked" ? "masked" : "original" };
+      const card = document.querySelector(`.audit-card[data-image-index="${CSS.escape(String(index))}"]`);
+      if (card) {
+        card.querySelectorAll(`input[name="rerunSource-${CSS.escape(String(index))}"]`).forEach(input => {
+          input.checked = input.value === state.selectedAudit.source;
+        });
+      }
+      document.querySelectorAll(".audit-card").forEach(item => item.classList.toggle("selected", item.dataset.imageIndex === String(index)));
+      document.querySelectorAll(".image-pane").forEach(item => {
+        item.classList.toggle("active", item.dataset.index === String(index) && item.dataset.selectSource === state.selectedAudit.source);
+      });
+      saveCache();
+    }
+
+    function switchTab(name) {
+      state.activeTab = name;
+      document.querySelectorAll(".tab").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === name));
+      ["audit", "preview", "source", "report"].forEach(id => $(id).classList.toggle("hidden", id !== name));
+      saveCache();
+    }
+
+    $("processLarkBtn").addEventListener("click", processLark);
+    $("processUploadBtn").addEventListener("click", processUpload);
+    $("fetchModelsBtn").addEventListener("click", fetchModels);
+    $("testCpaBtn").addEventListener("click", testCpa);
+    $("loadPromptsBtn").addEventListener("click", loadPrompts);
+    $("savePromptPathBtn").addEventListener("click", savePromptPath);
+    $("savePromptBtn").addEventListener("click", savePrompt);
+    $("copyMdBtn").addEventListener("click", copyPlain);
+    $("copyRichBtn").addEventListener("click", copyRichAndOpen);
+    $("helpBtn").addEventListener("click", openHelp);
+    $("settingsBtn").addEventListener("click", openSettings);
+    $("saveCpaBtn").addEventListener("click", saveCpaSettings);
+    $("saveLarkBtn").addEventListener("click", saveLarkSettings);
+    $("saveCsdnBtn").addEventListener("click", saveCsdnSettings);
+    $("openCsdnLoginBtn").addEventListener("click", openCsdnLogin);
+    $("readCsdnCookieBtn").addEventListener("click", readCsdnCookie);
+    $("closeSettingsBtn").addEventListener("click", closeSettings);
+    $("closeHelpBtn").addEventListener("click", closeHelp);
+    $("drawerBackdrop").addEventListener("click", closeDrawers);
+    $("clearCacheBtn").addEventListener("click", clearSessionCache);
+    $("pauseStreamBtn").addEventListener("click", toggleStreamPause);
+    $("checkLarkAccountBtn").addEventListener("click", checkLarkAccount);
+    $("listLarkUsersBtn").addEventListener("click", listLarkUsers);
+    $("listProfilesBtn").addEventListener("click", listProfiles);
+    $("useProfileBtn").addEventListener("click", useProfile);
+    $("startLarkLoginBtn").addEventListener("click", startLarkLogin);
+    $("completeLarkLoginBtn").addEventListener("click", completeLarkLogin);
+    $("closeLightboxBtn").addEventListener("click", closeLightbox);
+    $("closeInfoModalBtn").addEventListener("click", closeInfo);
+    $("infoModal").addEventListener("click", event => {
+      if (event.target.id === "infoModal") closeInfo();
+    });
+    $("imageLightbox").addEventListener("click", event => {
+      if (event.target.id === "imageLightbox") closeLightbox();
+    });
+    $("audit").addEventListener("click", event => {
+      const pane = event.target.closest(".image-pane");
+      if (pane) selectAuditImage(pane.dataset.index, pane.dataset.selectSource);
+      const image = event.target.closest(".audit-img");
+      if (image) openLightbox(image.src, image.dataset.title || image.alt);
+      const sourceInput = event.target.closest(".rerun-source input");
+      if (sourceInput) {
+        const card = sourceInput.closest(".audit-card");
+        selectAuditImage(card?.dataset.imageIndex, sourceInput.value);
+      }
+      const button = event.target.closest(".rerun-btn");
+      if (button) {
+        const card = button.closest(".audit-card");
+        const input = card?.querySelector(".rerun-input");
+        const source = card?.querySelector(`input[name="rerunSource-${CSS.escape(String(button.dataset.index))}"]:checked`)?.value || "original";
+        selectAuditImage(button.dataset.index, source);
+        rerunImage(button.dataset.index, input?.value || "", source);
+      }
+    });
+    $("helpHeroImg").addEventListener("click", () => openLightbox($("helpHeroImg").src, "工具使用流程图"));
+    document.querySelectorAll(".info-dot").forEach(btn => {
+      btn.addEventListener("mouseenter", () => btn.title = btn.dataset.info || "");
+      btn.addEventListener("click", () => openInfo(btn.dataset.infoTitle || "说明", btn.dataset.info || ""));
+    });
+    $("enhanceWithPrompt").addEventListener("change", syncPromptPicker);
+    $("industryPromptSelect").addEventListener("change", () => selectPrompt($("industryPromptSelect").value, true));
+    $("industryPromptMainSelect").addEventListener("change", () => selectPrompt($("industryPromptMainSelect").value, false));
+    $("modelSelect").addEventListener("change", () => {
+      $("modelManual").value = $("modelSelect").value;
+      saveCache();
+    });
+    $("healthBtn").addEventListener("click", async () => {
+      addLog("开始检查本机环境。");
+      const res = await fetch("/api/health");
+      const data = await readJsonResponse(res);
+      const message = `Python：${data.python || "-"}\nlark-cli：${data.larkCli || "未找到"}\n版本：${data.larkCliVersion || "-"}\nCSDN：${data.csdnEditorUrl || "-"}`;
+      setStatus(data.larkCli ? `环境正常。\n${message}` : `飞书 CLI 未找到。\n${message}`, data.larkCli ? "ok" : "error");
+      addLog(data.larkCli ? "本机环境检查通过。" : "飞书 CLI 未找到。", data.larkCli ? "ok" : "error");
+    });
+    document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+    document.querySelectorAll(".source-tab").forEach(btn => btn.addEventListener("click", () => switchImportTab(btn.dataset.sourceTab)));
+    document.querySelectorAll("input, textarea, select").forEach(el => {
+      if (el.id === "files") return;
+      el.addEventListener("input", saveCache);
+      el.addEventListener("change", saveCache);
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeLightbox();
+        closeInfo();
+        closeDrawers();
+      }
+    });
+
+    let cache = null;
+    try {
+      cache = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
+    } catch {
+      sessionStorage.removeItem(CACHE_KEY);
+    }
+    applyCachedInputs(cache);
+    syncPromptPicker();
+    loadPrompts();
+    restoreCachedResult(cache);
+  </script>
+</body>
+</html>

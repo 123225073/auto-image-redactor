@@ -1,0 +1,102 @@
+# Auto Image Redactor - Agent Guide
+
+This project is a local-first image redaction assistant for publishing SOP articles to CSDN. It can read Feishu/Lark document links through `lark-cli`, accept local Markdown/HTML/Word/PDF/image files, OCR the embedded screenshots, redact sensitive business text, and rebuild a safe article package.
+
+## Safety Rules For Agents
+
+- Do not publish to CSDN automatically. The final publish action must be confirmed by the human user.
+- Do not commit or upload local runtime data: `runs/`, `output/`, `test-results/`, logs, private prompts, or `sensitive_terms.txt`.
+- Treat Feishu links, CSDN cookies, CPA API keys, company names, supplier names, customer names, screenshots, and generated run outputs as private.
+- Prefer the CLI below for automation. Use the web UI only when the user needs to visually inspect results.
+- For SAP screenshots, avoid redacting standard UI labels by themselves. Redact actual business values such as company names, suppliers, customers, accounts, tax IDs, phone numbers, email addresses, and bank accounts.
+- If recognition looks wrong, use `rerun-image` with a per-image instruction instead of blindly reprocessing the whole document.
+
+## Main Commands
+
+Install dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Start the web UI:
+
+```bash
+python auto_image_redactor_cli.py serve
+```
+
+Check local dependencies:
+
+```bash
+python auto_image_redactor_cli.py health
+```
+
+Process local files:
+
+```bash
+python auto_image_redactor_cli.py process article.md --terms "某某公司,某某供应商" --jsonl
+```
+
+Process a Feishu/Lark document:
+
+```bash
+python auto_image_redactor_cli.py lark "https://example.feishu.cn/docx/..." --terms "某某公司,某某供应商" --jsonl
+```
+
+Use CPA model judging:
+
+```bash
+python auto_image_redactor_cli.py process article.docx --use-cpa --api-key "$CPA_API_KEY" --model "gpt-5.5"
+```
+
+Use an industry prompt file:
+
+```bash
+python auto_image_redactor_cli.py process article.docx --use-cpa --industry-prompt-file prompts/sap.txt
+```
+
+Rerun one image from the original screenshot:
+
+```bash
+python auto_image_redactor_cli.py rerun-image <job_id> 3 --image-source original --instruction "只打码右侧真实供应商名称，不要打码 SAP 标准字段"
+```
+
+Rerun one image from the current redacted image:
+
+```bash
+python auto_image_redactor_cli.py rerun-image <job_id> 3 --image-source masked --instruction "保留当前已打码区域，检查是否还有漏掉的客户名称"
+```
+
+## CLI Output Contract
+
+The CLI prints final JSON to stdout. With `--jsonl`, progress events are also printed as JSON Lines before the final result.
+
+Important final JSON fields:
+
+- `ok`: whether the command succeeded.
+- `jobId`: local run ID under `runs/<jobId>`.
+- `outputPath`: safe article path.
+- `reportPath`: Markdown report path.
+- `reportJsonPath`: structured image report.
+- `zipPath`: portable safe package.
+- `imageCount`: total images found.
+- `maskedRegions`: total redacted OCR regions.
+- `images[].matches`: redacted text list for each image.
+
+## Project Map
+
+- `static/index.html`: single-page HTML UI.
+- `web_tool.py`: Flask web server, Feishu/CSDN helpers, job management, upload conversion, rerun APIs.
+- `csdn_image_mosaic.py`: OCR, sensitive-text matching, SAP label filtering, mosaic rendering, article image replacement.
+- `auto_image_redactor_cli.py`: Agent-friendly command line entrypoint.
+- `sensitive_terms.example.txt`: safe sample terms. Local private terms should live in ignored `sensitive_terms.txt`.
+- `LLM.TXT`: this guide.
+
+## Typical Agent Workflow
+
+1. Run `python auto_image_redactor_cli.py health`.
+2. Process input using `process` or `lark` with `--jsonl`.
+3. Read the final JSON and inspect `reportJsonPath`.
+4. If specific images are wrong, call `rerun-image`.
+5. Give the user the web UI URL or output package for visual confirmation.
+6. Only after user confirmation, help copy/open CSDN. Do not click final publish for the user.

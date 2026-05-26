@@ -1,0 +1,21 @@
+# Copy this file to sensitive_terms.txt for local use.
+# One term per line. Commas and line breaks are both supported in the web UI.
+
+公司名称
+公司代码
+供应商名称
+客户名称
+联系人
+手机号
+邮箱
+地址
+税号
+统一社会信用代码
+银行账号
+SAP账号
+
+# Add your own company, supplier, customer, person, account, or project names below.
+# Example:
+# 某某科技有限公司
+# 某某供应商
+# 某某客户
