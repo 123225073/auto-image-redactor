@@ -304,6 +304,40 @@
       overflow-wrap: anywhere;
     }
     .auth-link a { color: #075985; font-weight: 900; }
+    .account-guide {
+      margin-top: 10px;
+      border: 1px solid #f3d59c;
+      background: #fff9ea;
+      border-radius: 9px;
+      padding: 11px;
+      color: #624000;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .account-guide strong {
+      color: #3b2a00;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    .account-steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .account-step {
+      border: 1px solid rgba(180, 112, 0, .2);
+      border-radius: 8px;
+      background: rgba(255,255,255,.72);
+      padding: 8px;
+      color: #4f3800;
+    }
+    .account-step b {
+      display: block;
+      color: #20314c;
+      margin-bottom: 3px;
+    }
     .status {
       margin-top: 14px;
       border: 1px solid #bdd7ff;
@@ -798,6 +832,24 @@
     .help-drawer {
       width: min(980px, 100vw);
     }
+    .help-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .help-tab {
+      min-height: 40px;
+      background: #fff;
+      color: var(--subtle);
+      border-color: var(--line);
+    }
+    .help-tab.active {
+      background: var(--ink);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(7,17,31,.18);
+    }
+    .help-pane.hidden { display: none; }
     .help-hero {
       width: 100%;
       border-radius: 10px;
@@ -843,6 +895,27 @@
       font-size: 12px;
       font-weight: 900;
       text-align: center;
+    }
+    .llm-guide-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .llm-guide {
+      min-height: 420px;
+      max-height: 62vh;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #07111f;
+      color: #d8e7ff;
+      padding: 16px;
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      font-family: Consolas, "Courier New", monospace;
     }
     .lightbox {
       position: fixed;
@@ -923,6 +996,7 @@
       .mini-grid { grid-template-columns: 1fr; }
       .doc-grid { grid-template-columns: 1fr; }
       .flow-strip { grid-template-columns: 1fr; }
+      .account-steps { grid-template-columns: 1fr; }
       .settings-grid { grid-template-columns: 1fr; }
       .settings-block.full { grid-column: auto; }
       .lightbox { padding: 12px; }
@@ -984,20 +1058,38 @@
       </section>
 
       <section class="settings-block">
-        <h3><span class="section-index">二</span>飞书账号授权 <button class="info-dot" type="button" data-info-title="飞书账号" data-info="这里管理 lark-cli 的飞书授权。CLI 不能强制指定企业账号；如果授权页只显示个人飞书，请把授权链接复制到已登录企业飞书的浏览器或无痕窗口打开。">!</button></h3>
-        <div id="larkAccountState" class="inline-state">尚未检查。切换账号时不需要密码，只需要在飞书授权页选择账号。</div>
+        <h3><span class="section-index">二</span>飞书账号授权 <button class="info-dot" type="button" data-info-title="飞书账号授权" data-info="这里管的是 lark-cli 的本地授权，不是飞书网页右上角的账号菜单。网页里有两个飞书账号，不代表 CLI 已经授权了两个账号；必须在授权页选择企业账号后，CLI 才能读取企业文档。">!</button></h3>
+        <div class="account-guide">
+          <strong>为什么网页里有两个飞书，但这里只看到一个？</strong>
+          飞书网页的“切换账号”只影响浏览器；本工具读取文档时调用的是本机 lark-cli。当前 lark-cli 只拿到了被授权账号的令牌，所以要读取纯米集团文档，需要重新发起授权，并在授权页选择“纯米集团/周广源”那个账号。
+          <div class="account-steps">
+            <div class="account-step"><b>1. 生成授权链接</b>点击“重新授权企业账号”。</div>
+            <div class="account-step"><b>2. 选择纯米账号</b>如果默认进了风沙，把链接复制到已登录纯米的浏览器或无痕窗口打开。</div>
+            <div class="account-step"><b>3. 回来确认</b>点“我已经完成授权”，再检查当前 CLI 授权账号。</div>
+          </div>
+        </div>
+        <div id="larkAccountState" class="inline-state">尚未检查。这里显示的是 CLI 真正能读取文档的账号。</div>
         <div class="actions">
-          <button class="secondary" id="checkLarkAccountBtn" type="button">检查当前飞书身份</button>
-          <button class="secondary" id="listLarkUsersBtn" type="button">查看已授权账号</button>
-          <button class="secondary" id="listProfilesBtn" type="button">高级：读取身份槽位</button>
+          <button class="secondary" id="checkLarkAccountBtn" type="button">检查当前 CLI 授权账号</button>
+          <button class="secondary" id="listLarkUsersBtn" type="button">查看 CLI 已授权账号</button>
+          <button class="green" id="startLarkLoginBtn" type="button">重新授权企业账号</button>
+          <button class="secondary" id="completeLarkLoginBtn" type="button">我已经完成授权</button>
+          <button class="secondary" id="copyAuthLinkBtn" type="button" disabled>复制授权链接</button>
+          <button class="secondary" id="openFeishuWebBtn" type="button">打开飞书网页</button>
+          <button class="secondary" id="saveLarkBtn" type="button">保存飞书设置</button>
         </div>
-        <div class="label-row"><label for="profileSelect">高级：飞书身份槽位</label><button class="info-dot" type="button" data-info-title="飞书身份槽位" data-info="这是 lark-cli 的工作身份配置，不等于普通意义上的飞书账号。一般不用动；只有你明确知道哪个身份能读取企业文档时，才需要切换。">!</button></div>
-        <div class="row">
-          <select id="profileSelect"><option value="">先读取身份槽位</option></select>
-          <button class="amber" id="useProfileBtn" type="button">使用这个身份读取文档</button>
-        </div>
+        <div id="authLinkBox" class="auth-link hidden"></div>
         <details class="advanced-box">
-          <summary>高级权限设置（通常不用展开）</summary>
+          <summary>高级：配置档和权限编号（通常不用展开）</summary>
+          <p class="hint">配置档不是普通飞书账号切换。只有你创建过多个 lark-cli 配置档，或报错提示缺权限编号时，才需要动这里。</p>
+          <div class="label-row"><label for="profileSelect">lark-cli 配置档</label><button class="info-dot" type="button" data-info-title="lark-cli 配置档" data-info="这是 lark-cli 的工作配置档，不等于飞书网页里的个人号/企业号。你现在看到的 cli_a95... 只是 CLI 应用配置，不是纯米账号入口。">!</button></div>
+          <div class="row">
+            <select id="profileSelect"><option value="">先读取配置档</option></select>
+            <button class="amber" id="listProfilesBtn" type="button">读取配置档</button>
+          </div>
+          <div class="actions">
+            <button class="secondary" id="useProfileBtn" type="button">切换到所选配置档</button>
+          </div>
           <label>默认授权内容</label>
           <div class="mini-grid">
             <label><input class="auth-domain" type="checkbox" value="docs" checked> 文档</label>
@@ -1007,12 +1099,6 @@
           <div class="label-row"><label for="authScope">高级权限编号</label><button class="info-dot" type="button" data-info-title="高级权限编号" data-info="这是飞书接口权限编号。普通情况留空即可；只有飞书报错明确提示缺少某个权限编号时，再复制到这里。">!</button></div>
           <input id="authScope" type="text" placeholder="一般留空；例如 docx:document:readonly">
         </details>
-        <div class="actions">
-          <button class="green" id="startLarkLoginBtn" type="button">授权一个飞书账号</button>
-          <button class="secondary" id="completeLarkLoginBtn" type="button">我已经点完授权</button>
-          <button class="secondary" id="saveLarkBtn" type="button">保存飞书设置</button>
-        </div>
-        <div id="authLinkBox" class="auth-link hidden"></div>
       </section>
 
       <section class="settings-block prompt-manager">
@@ -1062,26 +1148,40 @@
     <div class="drawer-head">
       <div>
         <h2>使用文档</h2>
-        <p class="hint">给新手看的 5 步说明：导入、设置规则、检查图片、复制发布。</p>
+        <p class="hint">新手说明和 Agent 操作说明分开查看。</p>
       </div>
       <button class="secondary" id="closeHelpBtn" type="button">关闭</button>
     </div>
     <div class="drawer-body">
-      <img id="helpHeroImg" class="help-hero" src="/static/assets/help-privacy-flow.png" alt="飞书文档和本地文件经过 OCR 脱敏后生成 CSDN 安全草稿的流程示意图">
-      <div class="flow-strip">
-        <div class="flow-step">1 导入文章</div>
-        <div class="flow-step">2 填敏感词</div>
-        <div class="flow-step">3 开始脱敏</div>
-        <div class="flow-step">4 检查图片</div>
-        <div class="flow-step">5 发布前确认</div>
+      <div class="help-tabs" role="tablist" aria-label="使用文档页签">
+        <button class="help-tab active" type="button" data-help-tab="guide">新手使用说明</button>
+        <button class="help-tab" type="button" data-help-tab="llm">Agent / LLM.TXT</button>
       </div>
-      <div class="doc-grid">
-        <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
-        <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。</p></div>
-        <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
-        <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
-        <div class="doc-card"><strong>什么时候用 CPA</strong><p>本地规则不确定时，在右上角“设置”里打开 CPA。它只发送 OCR 文字行，不上传整张截图。</p></div>
-        <div class="doc-card"><strong>怎么发到 CSDN</strong><p>确认图片检查和预览无误后，点击“复制富文本并打开 CSDN”。如已在设置里填写 CSDN Cookie，工具会先走 CSDN 原生图片上传，最终发布按钮仍由你人工确认。</p></div>
+      <div id="helpGuidePane" class="help-pane">
+        <img id="helpHeroImg" class="help-hero" src="/static/assets/help-privacy-flow.png" alt="飞书文档和本地文件经过 OCR 脱敏后生成 CSDN 安全草稿的流程示意图">
+        <div class="flow-strip">
+          <div class="flow-step">1 导入文章</div>
+          <div class="flow-step">2 填敏感词</div>
+          <div class="flow-step">3 开始脱敏</div>
+          <div class="flow-step">4 检查图片</div>
+          <div class="flow-step">5 发布前确认</div>
+        </div>
+        <div class="doc-grid">
+          <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
+          <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。</p></div>
+          <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
+          <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
+          <div class="doc-card"><strong>什么时候用 CPA</strong><p>本地规则不确定时，在右上角“设置”里打开 CPA。它只发送 OCR 文字行，不上传整张截图。</p></div>
+          <div class="doc-card"><strong>怎么发到 CSDN</strong><p>确认图片检查和预览无误后，点击“复制富文本并打开 CSDN”。如已在设置里填写 CSDN Cookie，工具会先走 CSDN 原生图片上传，最终发布按钮仍由你人工确认。</p></div>
+        </div>
+      </div>
+      <div id="helpLlmPane" class="help-pane hidden">
+        <div class="llm-guide-toolbar">
+          <button class="secondary" id="refreshLlmGuideBtn" type="button">重新读取 LLM.TXT</button>
+          <button class="green" id="copyLlmGuideBtn" type="button">复制给 Agent</button>
+          <span class="hint">这是给未来 Agent 操控本工具时看的说明文件。</span>
+        </div>
+        <pre id="llmGuideText" class="llm-guide">点击“Agent / LLM.TXT”页签后自动读取。</pre>
       </div>
     </div>
   </aside>
@@ -1202,7 +1302,10 @@
       activeImportTab: "lark",
       logs: [],
       larkDeviceCode: "",
+      larkAuthUrl: "",
       prompts: [],
+      llmGuideLoaded: false,
+      activeHelpTab: "guide",
       streamingJobId: "",
       streamingImages: [],
       streamingTotal: 0,
@@ -1252,8 +1355,10 @@
         authScope: $("authScope").value,
         authDomains: Array.from(document.querySelectorAll(".auth-domain:checked")).map(item => item.value),
         larkDeviceCode: state.larkDeviceCode,
+        larkAuthUrl: state.larkAuthUrl,
         activeTab: state.activeTab,
         activeImportTab: state.activeImportTab,
+        activeHelpTab: state.activeHelpTab,
         selectedAudit: state.selectedAudit,
         lastJobId: state.result?.jobId || "",
         logs: state.logs.slice(-80)
@@ -1299,6 +1404,9 @@
         document.querySelectorAll(".auth-domain").forEach(item => item.checked = cache.authDomains.includes(item.value));
       }
       state.larkDeviceCode = cache.larkDeviceCode || "";
+      state.larkAuthUrl = cache.larkAuthUrl || "";
+      if (state.larkAuthUrl) renderAuthLink(state.larkAuthUrl);
+      if (cache.activeHelpTab) state.activeHelpTab = cache.activeHelpTab;
       if (cache.selectedAudit) state.selectedAudit = cache.selectedAudit;
       state.logs = Array.isArray(cache.logs) ? cache.logs : [];
       renderLog();
@@ -1351,11 +1459,13 @@
       $("authScope").value = "";
       document.querySelectorAll(".auth-domain").forEach(item => item.checked = true);
       state.larkDeviceCode = "";
+      state.larkAuthUrl = "";
       $("authLinkBox").classList.add("hidden");
       $("authLinkBox").innerHTML = "";
-      $("larkAccountState").textContent = "尚未检查。切换账号时不需要密码，只需要在飞书授权页选择账号。";
+      $("copyAuthLinkBtn").disabled = true;
+      $("larkAccountState").textContent = "尚未检查。这里显示的是 CLI 真正能读取文档的账号。";
       $("larkQuickState").textContent = "飞书账号授权、企业账号选择、高级权限都已移到右上角“设置 → 飞书账号”。";
-      $("profileSelect").innerHTML = `<option value="">先读取身份槽位</option>`;
+      $("profileSelect").innerHTML = `<option value="">先读取配置档</option>`;
       document.querySelector('input[name="matchMode"][value="fuzzy"]').checked = true;
       switchImportTab("lark", { cache: false });
       $("meta").innerHTML = "";
@@ -1389,11 +1499,12 @@
         "processLarkBtn", "processUploadBtn", "healthBtn", "fetchModelsBtn", "testCpaBtn", "clearCacheBtn",
         "checkLarkAccountBtn", "listLarkUsersBtn", "listProfilesBtn", "useProfileBtn", "startLarkLoginBtn", "completeLarkLoginBtn",
         "loadPromptsBtn", "savePromptPathBtn", "savePromptBtn", "saveCpaBtn", "saveLarkBtn", "saveCsdnBtn",
-        "openCsdnLoginBtn", "readCsdnCookieBtn"
+        "openCsdnLoginBtn", "readCsdnCookieBtn", "openFeishuWebBtn", "copyAuthLinkBtn", "refreshLlmGuideBtn", "copyLlmGuideBtn"
       ].forEach(id => {
         const el = $(id);
         if (el) el.disabled = isBusy;
       });
+      if (!isBusy && $("copyAuthLinkBtn")) $("copyAuthLinkBtn").disabled = !state.larkAuthUrl;
       ["copyRichBtn", "copyMdBtn"].forEach(id => {
         const el = $(id);
         if (el) el.disabled = isBusy || !state.result;
@@ -1448,12 +1559,14 @@
       $("helpDrawer").classList.add("open");
       $("drawerBackdrop").classList.add("open");
       $("helpDrawer").setAttribute("aria-hidden", "false");
+      switchHelpTab(state.activeHelpTab || "guide", { cache: false });
     }
 
     function closeHelp() {
       $("helpDrawer").classList.remove("open");
       $("drawerBackdrop").classList.remove("open");
       $("helpDrawer").setAttribute("aria-hidden", "true");
+      saveCache();
     }
 
     function closeDrawers() {
@@ -1484,6 +1597,34 @@
     function closeInfo() {
       $("infoModal").classList.remove("open");
       $("infoModal").setAttribute("aria-hidden", "true");
+    }
+
+    function switchHelpTab(name, opts = {}) {
+      const target = name === "llm" ? "llm" : "guide";
+      state.activeHelpTab = target;
+      document.querySelectorAll(".help-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.helpTab === target));
+      $("helpGuidePane").classList.toggle("hidden", target !== "guide");
+      $("helpLlmPane").classList.toggle("hidden", target !== "llm");
+      if (target === "llm") loadLlmGuide();
+      if (opts.cache !== false) saveCache();
+    }
+
+    async function loadLlmGuide(force = false) {
+      if (state.llmGuideLoaded && !force) return;
+      $("llmGuideText").textContent = "正在读取 LLM.TXT...";
+      try {
+        const data = await apiJson("/api/llm-guide");
+        $("llmGuideText").textContent = data.content || "LLM.TXT 为空。";
+        state.llmGuideLoaded = true;
+      } catch (err) {
+        $("llmGuideText").textContent = `读取失败：${err.message || err}`;
+      }
+    }
+
+    async function copyLlmGuide() {
+      await navigator.clipboard.writeText($("llmGuideText").textContent || "");
+      setStatus("LLM.TXT 内容已复制，可以发给 Agent 使用。", "ok");
+      addLog("LLM.TXT 内容已复制。", "ok");
     }
 
     function syncPromptPicker() {
@@ -1526,7 +1667,7 @@
 
     function saveLarkSettings() {
       saveCache();
-      setSettingsStatus("飞书账号授权设置已保存。账号授权状态由 lark-cli 管理，这里会记住高级权限和身份选择信息。", "ok");
+      setSettingsStatus("飞书设置已保存。注意：真正能读哪个飞书账号，由 lark-cli 授权状态决定；请以“检查当前 CLI 授权账号”为准。", "ok");
     }
 
     function saveCsdnSettings() {
@@ -1563,10 +1704,11 @@
 
     function renderLarkStatus(status) {
       const lines = [
-        `<strong>当前账号：</strong>${escapeHtml(status.userName || "未登录")}`,
+        `<strong>当前 CLI 授权账号：</strong>${escapeHtml(status.userName || "未登录")}`,
         `<strong>状态：</strong>${escapeHtml(status.tokenStatus || status.userStatus || "-")}`,
         `<strong>身份：</strong>${escapeHtml(status.identity || status.defaultAs || "-")}`,
-        status.expiresAt ? `<strong>过期时间：</strong>${escapeHtml(status.expiresAt)}` : ""
+        status.expiresAt ? `<strong>过期时间：</strong>${escapeHtml(status.expiresAt)}` : "",
+        `<span class="hint">如果这里仍显示“风沙”，说明 CLI 还没有授权到“纯米集团”账号。请点“重新授权企业账号”，并在授权页选择纯米账号。</span>`
       ].filter(Boolean);
       $("larkAccountState").innerHTML = lines.join("<br>");
       $("larkQuickState").innerHTML = `当前飞书身份：<strong>${escapeHtml(status.userName || "未登录")}</strong>。账号切换在右上角“设置 → 飞书账号”。`;
@@ -1574,13 +1716,13 @@
 
     async function checkLarkAccount() {
       setBusy(true);
-      addLog("开始检查飞书当前账号。");
-      setSettingsStatus("正在检查当前飞书身份...");
+      addLog("开始检查 lark-cli 当前授权账号。");
+      setSettingsStatus("正在检查 lark-cli 当前授权账号...");
       try {
         const data = await apiJson("/api/lark/auth/status?verify=1");
         renderLarkStatus(data.status || {});
-        setSettingsStatus(`飞书账号可用：${data.status?.userName || "已登录"}`, "ok");
-        addLog(`飞书账号检查完成：${data.status?.userName || "已登录"}`, "ok");
+        setSettingsStatus(`CLI 当前可用账号：${data.status?.userName || "已登录"}`, "ok");
+        addLog(`CLI 授权账号检查完成：${data.status?.userName || "已登录"}`, "ok");
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
         addLog(err.message || String(err), "error");
@@ -1592,16 +1734,22 @@
 
     async function listLarkUsers() {
       setBusy(true);
-      addLog("开始读取已登录飞书账号列表。");
-      setSettingsStatus("正在读取已授权的飞书账号...");
+      addLog("开始读取 lark-cli 已授权账号列表。");
+      setSettingsStatus("正在读取 lark-cli 已授权账号...");
       try {
         const data = await apiJson("/api/lark/auth/list");
         const users = data.users || [];
-        $("larkAccountState").innerHTML = users.length
-          ? users.map(user => `${escapeHtml(user.userName || "-")} · ${escapeHtml(user.tokenStatus || "-")}`).join("<br>")
-          : "当前没有已登录的飞书用户。";
-        setSettingsStatus(`已读取 ${users.length} 个飞书账号。`, "ok");
-        addLog(`已读取 ${users.length} 个飞书账号。`, "ok");
+        if (users.length) {
+          const userLines = users.map((user, index) => `${index + 1}. ${escapeHtml(user.userName || "-")} · ${escapeHtml(user.tokenStatus || "-")}`);
+          const hint = users.length === 1
+            ? `<br><br><span class="hint">目前 CLI 只有这 1 个授权账号。飞书网页里能看到纯米集团，不代表 CLI 已授权纯米。要读取纯米文档，请点击“重新授权企业账号”，在授权页选纯米账号。</span>`
+            : `<br><br><span class="hint">如果列表里有多个账号，请再点“检查当前 CLI 授权账号”，确认当前读取文档的账号。</span>`;
+          $("larkAccountState").innerHTML = `<strong>CLI 已授权账号：</strong><br>${userLines.join("<br>")}${hint}`;
+        } else {
+          $("larkAccountState").innerHTML = "当前 lark-cli 没有已授权的飞书用户。请点击“重新授权企业账号”。";
+        }
+        setSettingsStatus(`已读取 ${users.length} 个 CLI 授权账号。`, "ok");
+        addLog(`已读取 ${users.length} 个 CLI 授权账号。`, "ok");
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
         addLog(err.message || String(err), "error");
@@ -1612,16 +1760,16 @@
 
     async function listProfiles() {
       setBusy(true);
-      addLog("开始读取飞书身份槽位。");
-      setSettingsStatus("正在读取飞书身份槽位...");
+      addLog("开始读取 lark-cli 配置档。");
+      setSettingsStatus("正在读取 lark-cli 配置档...");
       try {
         const data = await apiJson("/api/lark/profile/list");
         const profiles = data.profiles || [];
         $("profileSelect").innerHTML = profiles.length
           ? profiles.map(profile => `<option value="${escapeHtml(profile.name)}">${escapeHtml(profile.active ? "当前 · " : "")}${escapeHtml(profile.name)}${profile.user ? " · " + escapeHtml(profile.user) : ""}</option>`).join("")
-          : `<option value="">没有身份槽位</option>`;
-        setSettingsStatus(`已读取 ${profiles.length} 个飞书身份槽位。`, "ok");
-        addLog(`已读取 ${profiles.length} 个飞书身份槽位。`, "ok");
+          : `<option value="">没有配置档</option>`;
+        setSettingsStatus(`已读取 ${profiles.length} 个 lark-cli 配置档。配置档不是飞书网页账号。`, "ok");
+        addLog(`已读取 ${profiles.length} 个 lark-cli 配置档。`, "ok");
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
         addLog(err.message || String(err), "error");
@@ -1634,20 +1782,20 @@
     async function useProfile() {
       const profile = $("profileSelect").value;
       if (!profile) {
-        setSettingsStatus("请先读取并选择飞书身份槽位。", "error");
+        setSettingsStatus("请先读取并选择 lark-cli 配置档。", "error");
         return;
       }
-      if (!confirm(`确定使用这个飞书身份读取文档：${profile}？`)) return;
+      if (!confirm(`确定切换到这个 lark-cli 配置档：${profile}？\n\n注意：配置档不是飞书网页账号。如果你只是想用纯米集团账号，优先使用“重新授权企业账号”。`)) return;
       setBusy(true);
-      addLog(`开始切换飞书身份：${profile}`);
+      addLog(`开始切换 lark-cli 配置档：${profile}`);
       try {
         const data = await apiJson("/api/lark/profile/use", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ profile })
         });
-        setSettingsStatus(data.message || "飞书身份已切换。", "ok");
-        addLog(data.message || "飞书身份已切换。", "ok");
+        setSettingsStatus(data.message || "lark-cli 配置档已切换。", "ok");
+        addLog(data.message || "lark-cli 配置档已切换。", "ok");
         await checkLarkAccount();
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
@@ -1657,12 +1805,39 @@
       }
     }
 
+    function renderAuthLink(url) {
+      state.larkAuthUrl = url || "";
+      $("copyAuthLinkBtn").disabled = !state.larkAuthUrl;
+      if (!state.larkAuthUrl) {
+        $("authLinkBox").classList.add("hidden");
+        $("authLinkBox").innerHTML = "";
+        return;
+      }
+      $("authLinkBox").classList.remove("hidden");
+      $("authLinkBox").innerHTML = `授权链接已生成：<br><a href="${escapeHtml(state.larkAuthUrl)}" target="_blank" rel="noopener">${escapeHtml(state.larkAuthUrl)}</a><br><br><strong>关键提醒：</strong>打开后必须选择能访问目标文档的账号。若默认进入“风沙”，请复制链接到已登录“纯米集团”的浏览器窗口、Edge/Chrome 另一个用户配置、或无痕窗口中打开。`;
+    }
+
+    async function copyAuthLink() {
+      if (!state.larkAuthUrl) {
+        setSettingsStatus("请先点击“重新授权企业账号”生成授权链接。", "error");
+        return;
+      }
+      await navigator.clipboard.writeText(state.larkAuthUrl);
+      setSettingsStatus("授权链接已复制。请把它粘贴到已登录纯米集团飞书的浏览器或无痕窗口里打开。", "ok");
+      addLog("飞书授权链接已复制。", "ok");
+    }
+
+    function openFeishuWeb() {
+      window.open("https://www.feishu.cn/", "_blank", "noopener");
+      setSettingsStatus("已打开飞书网页。先确认网页里能切到纯米集团账号，再回到本工具生成授权链接。", "ok");
+    }
+
     async function startLarkLogin() {
       const domains = Array.from(document.querySelectorAll(".auth-domain:checked")).map(item => item.value);
       const scope = $("authScope").value.trim();
       setBusy(true);
-      addLog("开始发起飞书授权。");
-      setSettingsStatus("正在发起飞书授权...");
+      addLog("开始生成飞书企业账号授权链接。");
+      setSettingsStatus("正在生成飞书授权链接...");
       try {
         const data = await apiJson("/api/lark/auth/login/start", {
           method: "POST",
@@ -1672,11 +1847,12 @@
         const auth = data.auth || {};
         const url = auth.verification_uri_complete || auth.verification_url || auth.verification_uri || auth.url || "";
         state.larkDeviceCode = auth.device_code || auth.deviceCode || "";
-        $("authLinkBox").classList.remove("hidden");
-        $("authLinkBox").innerHTML = url
-          ? `请打开授权链接并选择要使用的飞书账号：<br><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a><br><br>如果这里只出现个人飞书，请复制这条链接，到已经登录企业飞书的浏览器或无痕窗口打开。完成后回到这里点“我已经点完授权”。`
-          : `授权已发起，但 CLI 没有返回链接。请查看运行进度。`;
-        setSettingsStatus("飞书授权已发起，请打开授权链接选择账号。", "ok");
+        renderAuthLink(url);
+        if (!url) {
+          $("authLinkBox").classList.remove("hidden");
+          $("authLinkBox").textContent = "授权已发起，但 CLI 没有返回链接。请查看运行进度。";
+        }
+        setSettingsStatus("飞书授权链接已生成。请在授权页选择“纯米集团/周广源”账号，完成后回到这里点“我已经完成授权”。", "ok");
         addLog("飞书授权链接已生成。", "ok");
         saveCache();
       } catch (err) {
@@ -1689,7 +1865,7 @@
 
     async function completeLarkLogin() {
       if (!state.larkDeviceCode) {
-        setSettingsStatus("请先点击“授权一个飞书账号”发起授权。", "error");
+        setSettingsStatus("请先点击“重新授权企业账号”生成授权链接。", "error");
         return;
       }
       setBusy(true);
@@ -1704,7 +1880,11 @@
         setSettingsStatus(data.message || "飞书授权完成。", "ok");
         addLog(data.message || "飞书授权完成。", "ok");
         state.larkDeviceCode = "";
+        state.larkAuthUrl = "";
+        $("copyAuthLinkBtn").disabled = true;
         $("authLinkBox").classList.add("hidden");
+        $("authLinkBox").innerHTML = "";
+        await listLarkUsers();
         await checkLarkAccount();
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
@@ -2303,6 +2483,10 @@
     $("useProfileBtn").addEventListener("click", useProfile);
     $("startLarkLoginBtn").addEventListener("click", startLarkLogin);
     $("completeLarkLoginBtn").addEventListener("click", completeLarkLogin);
+    $("copyAuthLinkBtn").addEventListener("click", copyAuthLink);
+    $("openFeishuWebBtn").addEventListener("click", openFeishuWeb);
+    $("refreshLlmGuideBtn").addEventListener("click", () => loadLlmGuide(true));
+    $("copyLlmGuideBtn").addEventListener("click", copyLlmGuide);
     $("closeLightboxBtn").addEventListener("click", closeLightbox);
     $("closeInfoModalBtn").addEventListener("click", closeInfo);
     $("infoModal").addEventListener("click", event => {
@@ -2352,6 +2536,7 @@
     });
     document.querySelectorAll(".tab").forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
     document.querySelectorAll(".source-tab").forEach(btn => btn.addEventListener("click", () => switchImportTab(btn.dataset.sourceTab)));
+    document.querySelectorAll(".help-tab").forEach(btn => btn.addEventListener("click", () => switchHelpTab(btn.dataset.helpTab)));
     document.querySelectorAll("input, textarea, select").forEach(el => {
       if (el.id === "files") return;
       el.addEventListener("input", saveCache);

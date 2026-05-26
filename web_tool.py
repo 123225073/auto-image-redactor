@@ -1242,6 +1242,19 @@ def industry_prompts_save():
         return json_error(f"保存行业提示词失败：{exc}", 500)
 
 
+@app.get("/api/llm-guide")
+def llm_guide():
+    try:
+        path = APP_DIR / "LLM.TXT"
+        if not path.exists():
+            raise UserVisibleError("没有找到 LLM.TXT 文件")
+        return jsonify({"ok": True, "path": str(path), "content": read_text(path)})
+    except UserVisibleError as exc:
+        return json_error(str(exc), 404)
+    except Exception as exc:  # noqa: BLE001
+        return json_error(f"读取 LLM.TXT 失败：{exc}", 500)
+
+
 @app.get("/api/lark/auth/status")
 def lark_auth_status():
     try:
