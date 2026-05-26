@@ -866,7 +866,7 @@ def split_instruction_clauses(text: str) -> list[str]:
 def clean_instruction_term(text: str) -> str:
     cleaned = re.sub(r"[\"'“”‘’`《》<>【】\[\]()（）]", "", text or "").strip()
     cleaned = re.sub(r"\s+", "", cleaned)
-    cleaned = re.sub(r"^(?:请|麻烦|帮我|帮忙|把|将|对|给|再|另外|还有|以及|和|只|仅|全部|所有)+", "", cleaned)
+    cleaned = re.sub(r"^(?:请|麻烦|帮我|帮忙|把|将|对|给|再|另外|还有|以及|和|只|仅|全部|所有|补充|新增|追加|继续|同时)+", "", cleaned)
     cleaned = re.sub(r"(?:也|都|全部|一起|统一|需要|要|进行|相关|内容|文字|词|字段|区域|部分|这些|这个|等|也)$", "", cleaned)
     return cleaned.strip()
 
@@ -877,11 +877,15 @@ def extract_redaction_terms_from_instruction(text: str) -> list[str]:
         compact = compact_text(clause)
         if re.search(r"(不需要|不用|不要|无需|别).{0,12}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
             continue
+        if re.search(r"(保留|保持|沿用|原来|原有|之前|上次|已).{0,8}(打码|脱敏|马赛克).{0,8}(部分|内容|区域)?$", compact):
+            continue
 
         candidates: list[str] = []
         for match in re.finditer(
             r"(?:请|麻烦|帮我|帮忙)?(?:把|将|对|给)?\s*"
-            r"(?P<term>[\u4e00-\u9fffA-Za-z0-9_.\-（）()·\s]{2,50}?)\s*"
+            r"[\"'“”‘’`《》<>【】\[\]()（）]?"
+            r"(?P<term>[\u4e00-\u9fffA-Za-z0-9_.\-（）()·\s]{2,50}?)"
+            r"[\"'“”‘’`《》<>【】\[\]()（）]?\s*"
             r"(?:也|都|全部|一起|统一|需要|要|进行)?\s*"
             r"(?:打码|脱敏|马赛克|遮盖|隐藏|屏蔽)",
             clause,
@@ -889,8 +893,8 @@ def extract_redaction_terms_from_instruction(text: str) -> list[str]:
             candidates.append(match.group("term"))
 
         for match in re.finditer(
-            r"(?:只|仅|全部|统一)?\s*(?:打码|脱敏|马赛克|遮盖|隐藏|屏蔽)"
-            r"(?:内容|文字|词|字段|区域|部分)?\s*[:：]?\s*"
+            r"(?:只|仅|全部|统一|补充|新增|追加|继续|再)?\s*(?:打码|脱敏|马赛克|遮盖|隐藏|屏蔽)"
+            r"(?:内容|文字|词|字段|区域|部分)?\s*[:：]?\s*[\"'“”‘’`《》<>【】\[\]()（）]?"
             r"(?P<term>[\u4e00-\u9fffA-Za-z0-9_.\-（）()·\s、/，,;；和以及]{2,80})",
             clause,
         ):
@@ -910,6 +914,38 @@ def extract_redaction_terms_from_instruction(text: str) -> list[str]:
             seen.add(key)
             unique.append(term)
     return unique
+
+
+def is_strict_only_instruction(text: str) -> bool:
+    for clause in split_instruction_clauses(text):
+        compact = compact_text(clause)
+        if not compact:
+            continue
+        if re.search(r"(其他|其它|其余|剩下|别的).{0,10}(不需要|不用|不要|无需|别).{0,10}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            return True
+        if re.search(r"(只|仅|只需要|仅需要|只用|仅用).{0,10}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            return True
+        if re.search(r"(只|仅|只需要|仅需要|只用|仅用).{0,10}(关注|考虑|处理|识别)", compact):
+            return True
+        if re.search(r"(不考虑|忽略|不要管).{0,12}(之前|原来|原有|上次|已打码|已有)", compact):
+            return True
+    return False
+
+
+def is_additive_instruction(text: str) -> bool:
+    if is_strict_only_instruction(text):
+        return False
+    for clause in split_instruction_clauses(text):
+        compact = compact_text(clause)
+        if not compact:
+            continue
+        if re.search(r"(保留|保持|沿用|继续使用).{0,12}(原图|原来|原有|之前|上次|已打码|已有|已识别)", compact):
+            return True
+        if re.search(r"(补充|新增|追加|再|继续|同时).{0,8}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            return True
+        if re.search(r"(也|一起|一并|同样).{0,4}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            return True
+    return False
 
 
 def instruction_terms_for_matching(text: str, match_mode: str) -> list[str]:
@@ -947,8 +983,13 @@ def process_image(
     boxes = load_ocr_boxes(source_path, args.min_confidence)
     enhance_with_prompt = bool(getattr(args, "enhance_with_prompt", False))
     image_instruction = str(getattr(args, "image_instruction", "") or "")
+    ai_image_instruction = str(getattr(args, "ai_image_instruction", "") or image_instruction)
     instruction_terms = instruction_terms_for_matching(image_instruction, getattr(args, "match_mode", "fuzzy"))
-    effective_terms = terms + instruction_terms
+    extra_terms = list(getattr(args, "extra_terms", []) or [])
+    if bool(getattr(args, "strict_terms", False)):
+        effective_terms = extra_terms + instruction_terms
+    else:
+        effective_terms = terms + extra_terms + instruction_terms
     local_mask_ids = find_local_mask_ids(boxes, effective_terms, getattr(args, "mask_all_text", False))
     forced_instruction_ids = instruction_term_mask_ids(boxes, instruction_terms)
     mask_ids = set(local_mask_ids)
@@ -970,12 +1011,14 @@ def process_image(
                 effective_terms,
                 args.match_mode,
                 getattr(args, "industry_prompt", "") or "",
-                image_instruction,
+                ai_image_instruction,
                 local_mask_ids,
-                enhance_with_prompt or bool(image_instruction.strip()),
+                enhance_with_prompt or bool(ai_image_instruction.strip()),
             )
-            if enhance_with_prompt or image_instruction.strip():
+            if enhance_with_prompt or ai_image_instruction.strip():
                 mask_ids = ai_mask_ids
+                if bool(getattr(args, "preserve_local_mask_ids", False)):
+                    mask_ids.update(local_mask_ids)
                 mask_ids.update(forced_instruction_ids)
             else:
                 mask_ids.update(ai_mask_ids)

@@ -151,7 +151,6 @@ def cmd_lark(args: argparse.Namespace) -> int:
 def cmd_rerun(args: argparse.Namespace) -> int:
     job_dir = web_tool.get_job_dir(args.job_id)
     payload = payload_from_args(args)
-    payload["imageSource"] = args.image_source
     result = web_tool.rerun_single_image(job_dir, args.image_index, payload)
     emit_json(summarize_result(result, job_dir, args.full))
     return 0
@@ -202,7 +201,6 @@ def build_parser() -> argparse.ArgumentParser:
     rerun = subparsers.add_parser("rerun-image", help="对某个任务中的单张图片重新识别")
     rerun.add_argument("job_id", help="任务 ID")
     rerun.add_argument("image_index", type=int, help="图片序号，从 1 开始")
-    rerun.add_argument("--image-source", choices=["original", "masked"], default="original", help="重新识别基于原图还是当前打码图")
     rerun.add_argument("--instruction", default="", help="这一张图的单独识别要求")
     add_processing_options(rerun)
     rerun.set_defaults(func=cmd_rerun)

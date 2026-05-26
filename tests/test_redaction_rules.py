@@ -5,7 +5,9 @@ from csdn_image_mosaic import (
     extract_redaction_terms_from_instruction,
     find_local_mask_ids,
     instruction_terms_for_matching,
+    is_additive_instruction,
     is_no_mask_instruction,
+    is_strict_only_instruction,
     load_terms,
 )
 
@@ -92,6 +94,18 @@ class RedactionRulesTest(unittest.TestCase):
     def test_no_mask_instruction_does_not_swallow_exclusion_rules(self) -> None:
         self.assertTrue(is_no_mask_instruction("\u8fd9\u5f20\u56fe\u4e0d\u9700\u8981\u6253\u7801"))
         self.assertFalse(is_no_mask_instruction("\u4e0d\u8981\u6253\u7801 SAP \u6807\u51c6\u5b57\u6bb5"))
+
+    def test_rerun_instruction_modes(self) -> None:
+        additive = "\u4fdd\u7559\u539f\u56fe\u5df2\u6253\u7801\u90e8\u5206\uff0c\u8865\u5145\u6253\u7801\u6c5f\u95e8\u4e50\u7c73"
+        strict = "\u5176\u4ed6\u4e0d\u9700\u8981\u6253\u7801\uff0c\u53ea\u9700\u8981\u6253\u7801\u6c5f\u95e8\u4e50\u7c73"
+        direct = "\u6253\u7801\u6c5f\u95e8\u4e50\u7c73"
+        self.assertTrue(is_additive_instruction(additive))
+        self.assertFalse(is_strict_only_instruction(additive))
+        self.assertTrue(is_strict_only_instruction(strict))
+        self.assertFalse(is_additive_instruction(strict))
+        self.assertEqual(extract_redaction_terms_from_instruction(additive), ["\u6c5f\u95e8\u4e50\u7c73"])
+        self.assertEqual(extract_redaction_terms_from_instruction(strict), ["\u6c5f\u95e8\u4e50\u7c73"])
+        self.assertEqual(extract_redaction_terms_from_instruction(direct), ["\u6c5f\u95e8\u4e50\u7c73"])
 
 
 if __name__ == "__main__":

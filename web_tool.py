@@ -29,6 +29,10 @@ from csdn_image_mosaic import (
     IMAGE_SUFFIXES,
     ProcessResult,
     collect_image_refs,
+    extract_redaction_terms_from_instruction,
+    is_additive_instruction,
+    is_no_mask_instruction,
+    is_strict_only_instruction,
     load_terms,
     process_document,
     process_image,
@@ -875,13 +879,7 @@ def resolve_output_image_ref(job_dir: Path, image_ref: str | None) -> Path | Non
     return None
 
 
-def resolve_image_source(job_dir: Path, image_info: dict[str, Any], image_source: str = "original") -> Path:
-    if image_source == "masked":
-        masked = resolve_output_image_ref(job_dir, image_info.get("outputRef"))
-        if masked:
-            return masked
-        raise UserVisibleError("找不到当前打码后的图片，无法基于打码图重新识别。")
-
+def resolve_image_source(job_dir: Path, image_info: dict[str, Any]) -> Path:
     candidates = [
         image_info.get("sourceImageRef"),
         image_info.get("sourcePath"),
@@ -916,6 +914,54 @@ def is_output_image_ref(ref: str | None) -> bool:
     return Path(str(ref).split("?", 1)[0]).suffix.lower() in IMAGE_SUFFIXES
 
 
+def clean_previous_match_terms(matches: list[dict[str, Any]]) -> list[str]:
+    terms: list[str] = []
+    seen = set()
+    for match in matches or []:
+        text = str(match.get("text") or "").strip()
+        if not text:
+            continue
+        key = re.sub(r"\s+", "", text).lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        terms.append(text)
+    return terms
+
+
+def build_rerun_instruction_options(image_info: dict[str, Any], options: Namespace) -> tuple[list[str], bool, str]:
+    instruction = str(getattr(options, "image_instruction", "") or "").strip()
+    previous_terms = clean_previous_match_terms(image_info.get("matches") or [])
+    if instruction and is_no_mask_instruction(instruction):
+        return [], True, instruction
+
+    instruction_terms = extract_redaction_terms_from_instruction(instruction)
+    strict_only = bool(instruction and is_strict_only_instruction(instruction))
+    additive = bool(instruction and is_additive_instruction(instruction))
+    if instruction_terms and not additive and not strict_only:
+        strict_only = True
+
+    if strict_only:
+        ai_instruction = "\n".join(
+            [
+                "本次是单图二次识别。用户要求只按本次输入处理，忽略之前识别结果、默认敏感词和全局规则。",
+                f"用户最新要求：{instruction}",
+                f"从用户要求中提取的强制打码词：{json.dumps(instruction_terms, ensure_ascii=False)}",
+            ]
+        )
+        return [], True, ai_instruction
+
+    extra_terms = previous_terms if additive else []
+    ai_instruction_parts = ["本次是单图二次识别，请以原图重新判断。"]
+    if additive:
+        ai_instruction_parts.append("用户希望保留原来已打码内容，并在此基础上补充新要求。")
+        ai_instruction_parts.append(f"原来已命中的打码内容：{json.dumps(previous_terms, ensure_ascii=False)}")
+    if instruction:
+        ai_instruction_parts.append(f"用户最新要求：{instruction}")
+        ai_instruction_parts.append(f"从用户要求中提取的强制打码词：{json.dumps(instruction_terms, ensure_ascii=False)}")
+    return extra_terms, False, "\n".join(ai_instruction_parts)
+
+
 def rerun_single_image(job_dir: Path, image_index: int, payload: dict[str, Any]) -> dict[str, Any]:
     report_data = load_report_data(job_dir)
     images = report_data.get("images") or []
@@ -923,22 +969,24 @@ def rerun_single_image(job_dir: Path, image_index: int, payload: dict[str, Any])
         raise UserVisibleError("图片序号无效")
 
     image_info = images[image_index - 1]
-    image_source = payload.get("imageSource") or "original"
-    if image_source not in {"original", "masked"}:
-        image_source = "original"
-    source_path = resolve_image_source(job_dir, image_info, image_source)
+    source_path = resolve_image_source(job_dir, image_info)
     output_path = find_output_path(job_dir)
     output_dir = job_dir / "output"
     images_dir = output_dir / "images"
     rerun_payload = build_rerun_payload(job_dir, payload)
     options = build_options(job_dir, Path(read_json_file(job_dir / "options.json", {}).get("sourcePath") or output_path), rerun_payload)
     options.image_instruction = payload.get("imageInstruction") or rerun_payload.get("imageInstruction") or ""
+    additive = bool(options.image_instruction and is_additive_instruction(options.image_instruction))
+    extra_terms, strict_terms, ai_instruction = build_rerun_instruction_options(image_info, options)
+    options.extra_terms = [f"exact:{term}" for term in extra_terms]
+    options.strict_terms = strict_terms
+    options.ai_image_instruction = ai_instruction
+    options.preserve_local_mask_ids = additive and not strict_terms
     terms = load_terms(Path(options.terms))
 
     original_output_ref = image_info.get("outputRef")
     source_ref = image_info.get("sourceRef") or image_info.get("originalRef") or f"image-{image_index}"
-    processing_ref = str(source_ref) if image_source == "original" else f"{source_ref}__masked_input"
-    new_source_image_ref, new_output_ref, masked_count, matches = process_image(processing_ref, source_path, images_dir, terms, options)
+    new_source_image_ref, new_output_ref, masked_count, matches = process_image(str(source_ref), source_path, images_dir, terms, options)
 
     if is_output_image_ref(original_output_ref) and original_output_ref != new_output_ref:
         src = (output_dir / new_output_ref).resolve()
@@ -953,9 +1001,9 @@ def rerun_single_image(job_dir: Path, image_index: int, payload: dict[str, Any])
             "status": "ok",
             "outputRef": new_output_ref,
             "sourcePath": str(source_path),
-            "sourceImageRef": new_source_image_ref if image_source == "original" or not image_info.get("sourceImageRef") else image_info.get("sourceImageRef"),
-            "rerunInputRef": new_source_image_ref if image_source == "masked" else None,
-            "lastRerunSource": image_source,
+            "sourceImageRef": new_source_image_ref,
+            "rerunInputRef": None,
+            "lastRerunSource": "original",
             "maskedRegions": masked_count,
             "error": None,
             "matches": matches,

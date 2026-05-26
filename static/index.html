@@ -740,25 +740,6 @@
       border-top: 1px dashed var(--line);
       padding-top: 10px;
     }
-    .rerun-source {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin: 8px 0;
-    }
-    .rerun-source label {
-      margin: 0;
-      border: 1px solid var(--line);
-      border-radius: 7px;
-      background: #fff;
-      color: var(--ink);
-      padding: 8px;
-      font-size: 12px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
     .rerun-box textarea {
       min-height: 64px;
       font-size: 13px;
@@ -2120,11 +2101,7 @@
               <div class="match-list">${matchHtml}</div>
               ${note}
               <div class="rerun-box">
-                <div class="rerun-source">
-                  <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="original" ${selectedSource !== "masked" ? "checked" : ""}> 基于原图</label>
-                  <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="masked" ${selectedSource === "masked" ? "checked" : ""}> 基于打码图</label>
-                </div>
-                <textarea class="rerun-input" placeholder="可选：写这一张图的特殊要求，例如：江门乐米 也打码；这张图不需要打码；只打码供应商名称；不要打码 SAP 标准字段。"></textarea>
+                <textarea class="rerun-input" placeholder="可选：写这一张图的特殊要求，例如：保留原图已打码部分，补充打码江门乐米；其他不需要打码，只需要打码江门乐米；这张图不需要打码。"></textarea>
                 <div class="actions">
                   <button class="secondary rerun-btn" type="button" data-index="${escapeHtml(item.index)}" ${item.status === "processing" || opts.streaming ? "disabled" : ""}>重新识别这张图</button>
                 </div>
@@ -2172,13 +2149,13 @@
       }
     }
 
-    async function rerunImage(index, instruction, imageSource = "original") {
+    async function rerunImage(index, instruction) {
       if (!state.result?.jobId) return;
       setBusy(true);
       setStatus(`正在重新识别第 ${index} 张图片...`);
-      addLog(`开始重新识别第 ${index} 张图片，来源：${imageSource === "masked" ? "打码图" : "原图"}。`);
+      addLog(`开始基于原图重新识别第 ${index} 张图片。`);
       try {
-        const payload = { ...options(), imageInstruction: instruction || "", imageSource };
+        const payload = { ...options(), imageInstruction: instruction || "" };
         const data = await apiJson(`/api/jobs/${state.result.jobId}/images/${index}/rerun`, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -2437,11 +2414,6 @@
     function selectAuditImage(index, source = "original") {
       state.selectedAudit = { index: Number(index), source: source === "masked" ? "masked" : "original" };
       const card = document.querySelector(`.audit-card[data-image-index="${CSS.escape(String(index))}"]`);
-      if (card) {
-        card.querySelectorAll(`input[name="rerunSource-${CSS.escape(String(index))}"]`).forEach(input => {
-          input.checked = input.value === state.selectedAudit.source;
-        });
-      }
       document.querySelectorAll(".audit-card").forEach(item => item.classList.toggle("selected", item.dataset.imageIndex === String(index)));
       document.querySelectorAll(".image-pane").forEach(item => {
         item.classList.toggle("active", item.dataset.index === String(index) && item.dataset.selectSource === state.selectedAudit.source);
@@ -2500,18 +2472,12 @@
       if (pane) selectAuditImage(pane.dataset.index, pane.dataset.selectSource);
       const image = event.target.closest(".audit-img");
       if (image) openLightbox(image.src, image.dataset.title || image.alt);
-      const sourceInput = event.target.closest(".rerun-source input");
-      if (sourceInput) {
-        const card = sourceInput.closest(".audit-card");
-        selectAuditImage(card?.dataset.imageIndex, sourceInput.value);
-      }
       const button = event.target.closest(".rerun-btn");
       if (button) {
         const card = button.closest(".audit-card");
         const input = card?.querySelector(".rerun-input");
-        const source = card?.querySelector(`input[name="rerunSource-${CSS.escape(String(button.dataset.index))}"]:checked`)?.value || "original";
-        selectAuditImage(button.dataset.index, source);
-        rerunImage(button.dataset.index, input?.value || "", source);
+        selectAuditImage(button.dataset.index, "original");
+        rerunImage(button.dataset.index, input?.value || "");
       }
     });
     $("helpHeroImg").addEventListener("click", () => openLightbox($("helpHeroImg").src, "工具使用流程图"));
