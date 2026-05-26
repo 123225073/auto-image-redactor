@@ -855,6 +855,88 @@ def apply_mosaic(image: Image.Image, regions: list[tuple[int, int, int, int]], b
     return output
 
 
+def split_instruction_clauses(text: str) -> list[str]:
+    return [
+        item.strip()
+        for item in re.split(r"[\n,，;；。.!！?？]+", text or "")
+        if item.strip()
+    ]
+
+
+def clean_instruction_term(text: str) -> str:
+    cleaned = re.sub(r"[\"'“”‘’`《》<>【】\[\]()（）]", "", text or "").strip()
+    cleaned = re.sub(r"\s+", "", cleaned)
+    cleaned = re.sub(r"^(?:请|麻烦|帮我|帮忙|把|将|对|给|再|另外|还有|以及|和|只|仅|全部|所有)+", "", cleaned)
+    cleaned = re.sub(r"(?:也|都|全部|一起|统一|需要|要|进行|相关|内容|文字|词|字段|区域|部分|这些|这个|等|也)$", "", cleaned)
+    return cleaned.strip()
+
+
+def extract_redaction_terms_from_instruction(text: str) -> list[str]:
+    terms: list[str] = []
+    for clause in split_instruction_clauses(text):
+        compact = compact_text(clause)
+        if re.search(r"(不需要|不用|不要|无需|别).{0,12}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            continue
+
+        candidates: list[str] = []
+        for match in re.finditer(
+            r"(?:请|麻烦|帮我|帮忙)?(?:把|将|对|给)?\s*"
+            r"(?P<term>[\u4e00-\u9fffA-Za-z0-9_.\-（）()·\s]{2,50}?)\s*"
+            r"(?:也|都|全部|一起|统一|需要|要|进行)?\s*"
+            r"(?:打码|脱敏|马赛克|遮盖|隐藏|屏蔽)",
+            clause,
+        ):
+            candidates.append(match.group("term"))
+
+        for match in re.finditer(
+            r"(?:只|仅|全部|统一)?\s*(?:打码|脱敏|马赛克|遮盖|隐藏|屏蔽)"
+            r"(?:内容|文字|词|字段|区域|部分)?\s*[:：]?\s*"
+            r"(?P<term>[\u4e00-\u9fffA-Za-z0-9_.\-（）()·\s、/，,;；和以及]{2,80})",
+            clause,
+        ):
+            candidates.append(match.group("term"))
+
+        for candidate in candidates:
+            for part in re.split(r"[、/，,;；]+|(?:和|以及)", candidate):
+                term = clean_instruction_term(part)
+                if 2 <= len(term) <= 40 and not re.search(r"(打码|脱敏|马赛克|遮盖|隐藏|屏蔽|不要|不用|无需|不需要)", term):
+                    terms.append(term)
+
+    unique: list[str] = []
+    seen = set()
+    for term in terms:
+        key = term.lower()
+        if key not in seen:
+            seen.add(key)
+            unique.append(term)
+    return unique
+
+
+def instruction_terms_for_matching(text: str, match_mode: str) -> list[str]:
+    prefix = "exact:" if match_mode == "exact" else "fuzzy:"
+    return [f"{prefix}{term}" for term in extract_redaction_terms_from_instruction(text)]
+
+
+def instruction_term_mask_ids(boxes: list[OcrBox], instruction_terms: list[str]) -> set[int]:
+    if not instruction_terms:
+        return set()
+    return {box.id for box in boxes if box.text and term_matches(box.text, instruction_terms)}
+
+
+def is_no_mask_instruction(text: str) -> bool:
+    for clause in split_instruction_clauses(text):
+        compact = compact_text(clause)
+        if not compact:
+            continue
+        if re.fullmatch(r"(不需要|不用|不要|无需|别)(任何|全部|所有)?(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)(了|处理)?", compact):
+            return True
+        if re.search(r"(这张图|本张图|当前图|整张图|整幅图|该图|图片|图中|全部|所有).{0,8}(不需要|不用|不要|无需|别).{0,8}(打码|脱敏|马赛克|遮盖|隐藏|屏蔽)", compact):
+            return True
+        if re.search(r"\b(no|without|skip)\s+(mask|mosaic|redact)\b", clause, re.IGNORECASE):
+            return True
+    return False
+
+
 def process_image(
     ref: str,
     source_path: Path,
@@ -863,17 +945,14 @@ def process_image(
     args: argparse.Namespace,
 ) -> tuple[str, str, int, list[dict[str, Any]]]:
     boxes = load_ocr_boxes(source_path, args.min_confidence)
-    local_mask_ids = find_local_mask_ids(boxes, terms, getattr(args, "mask_all_text", False))
-    mask_ids = set(local_mask_ids)
     enhance_with_prompt = bool(getattr(args, "enhance_with_prompt", False))
     image_instruction = str(getattr(args, "image_instruction", "") or "")
-    no_mask_instruction = bool(
-        image_instruction
-        and (
-            re.search(r"(不需要|不用|不要|无需).{0,6}(打码|脱敏|马赛克)", image_instruction)
-            or re.search(r"\b(no|without|skip)\s+(mask|mosaic|redact)", image_instruction, re.IGNORECASE)
-        )
-    )
+    instruction_terms = instruction_terms_for_matching(image_instruction, getattr(args, "match_mode", "fuzzy"))
+    effective_terms = terms + instruction_terms
+    local_mask_ids = find_local_mask_ids(boxes, effective_terms, getattr(args, "mask_all_text", False))
+    forced_instruction_ids = instruction_term_mask_ids(boxes, instruction_terms)
+    mask_ids = set(local_mask_ids)
+    no_mask_instruction = bool(image_instruction and is_no_mask_instruction(image_instruction))
     if no_mask_instruction:
         mask_ids = set()
         enhance_with_prompt = False
@@ -888,7 +967,7 @@ def process_image(
                 api_key,
                 args.base_url,
                 args.model,
-                terms,
+                effective_terms,
                 args.match_mode,
                 getattr(args, "industry_prompt", "") or "",
                 image_instruction,
@@ -897,9 +976,10 @@ def process_image(
             )
             if enhance_with_prompt or image_instruction.strip():
                 mask_ids = ai_mask_ids
+                mask_ids.update(forced_instruction_ids)
             else:
                 mask_ids.update(ai_mask_ids)
-            mask_ids = filter_standard_mask_ids(boxes, mask_ids, terms)
+            mask_ids = filter_standard_mask_ids(boxes, mask_ids, effective_terms)
         except Exception as exc:  # noqa: BLE001
             print(f"CPA 判断失败，已继续使用本地规则：{exc}", file=sys.stderr)
 

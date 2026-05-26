@@ -2124,7 +2124,7 @@
                   <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="original" ${selectedSource !== "masked" ? "checked" : ""}> 基于原图</label>
                   <label><input type="radio" name="rerunSource-${escapeHtml(item.index)}" value="masked" ${selectedSource === "masked" ? "checked" : ""}> 基于打码图</label>
                 </div>
-                <textarea class="rerun-input" placeholder="可选：写这一张图的特殊要求，例如：这张图不需要打码；只打码供应商名称；不要打码 SAP 标准字段。"></textarea>
+                <textarea class="rerun-input" placeholder="可选：写这一张图的特殊要求，例如：江门乐米 也打码；这张图不需要打码；只打码供应商名称；不要打码 SAP 标准字段。"></textarea>
                 <div class="actions">
                   <button class="secondary rerun-btn" type="button" data-index="${escapeHtml(item.index)}" ${item.status === "processing" || opts.streaming ? "disabled" : ""}>重新识别这张图</button>
                 </div>

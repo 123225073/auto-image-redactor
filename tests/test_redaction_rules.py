@@ -1,6 +1,13 @@
 import unittest
 
-from csdn_image_mosaic import OcrBox, find_local_mask_ids, load_terms
+from csdn_image_mosaic import (
+    OcrBox,
+    extract_redaction_terms_from_instruction,
+    find_local_mask_ids,
+    instruction_terms_for_matching,
+    is_no_mask_instruction,
+    load_terms,
+)
 
 
 DEFAULT_BUSINESS_TERMS = [
@@ -68,6 +75,23 @@ class RedactionRulesTest(unittest.TestCase):
             [1],
             self.terms + ["11206030010002"],
         )
+
+    def test_single_image_instruction_adds_temporary_redaction_terms(self) -> None:
+        instruction = "\u6c5f\u95e8\u4e50\u7c73 \u4e5f\u6253\u7801"
+        self.assertEqual(extract_redaction_terms_from_instruction(instruction), ["\u6c5f\u95e8\u4e50\u7c73"])
+        self.assertEqual(
+            extract_redaction_terms_from_instruction("\u4e0d\u8981\u6253\u7801 SAP \u6807\u51c6\u5b57\u6bb5\uff1b\u6c5f\u95e8\u4e50\u7c73\u4e5f\u6253\u7801"),
+            ["\u6c5f\u95e8\u4e50\u7c73"],
+        )
+        self.assert_masked_ids(
+            [box(1, "1 \u6c5f\u95e8\u4e50\u7c73")],
+            [1],
+            self.terms + instruction_terms_for_matching(instruction, "fuzzy"),
+        )
+
+    def test_no_mask_instruction_does_not_swallow_exclusion_rules(self) -> None:
+        self.assertTrue(is_no_mask_instruction("\u8fd9\u5f20\u56fe\u4e0d\u9700\u8981\u6253\u7801"))
+        self.assertFalse(is_no_mask_instruction("\u4e0d\u8981\u6253\u7801 SAP \u6807\u51c6\u5b57\u6bb5"))
 
 
 if __name__ == "__main__":
