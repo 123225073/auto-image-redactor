@@ -37,7 +37,7 @@ Process local files:
 python auto_image_redactor_cli.py process article.md --terms "某某公司,某某供应商" --jsonl
 ```
 
-Process a Feishu/Lark document:
+Process a Feishu/Lark link. `docx/wiki` links are read as documents; `file` links are downloaded from Drive first and require `drive:drive.metadata:readonly drive:file:download` user scopes:
 
 ```bash
 python auto_image_redactor_cli.py lark "https://example.feishu.cn/docx/..." --terms "某某公司,某某供应商" --jsonl

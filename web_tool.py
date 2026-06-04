@@ -16,6 +16,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Any
+from urllib.parse import quote, unquote, urlparse
 
 from bs4 import BeautifulSoup
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
@@ -31,13 +32,17 @@ from csdn_image_mosaic import (
     collect_image_refs,
     extract_redaction_terms_from_instruction,
     is_additive_instruction,
+    is_data_image,
     is_no_mask_instruction,
     is_strict_only_instruction,
+    is_url,
+    looks_like_image,
     load_terms,
     process_document,
     process_image,
     read_text,
     replace_refs,
+    resolve_local_image,
     write_report,
     write_report_json,
     write_text,
@@ -48,7 +53,21 @@ APP_DIR = Path(__file__).resolve().parent
 RUNS_DIR = APP_DIR / "runs"
 PROMPTS_CONFIG_PATH = APP_DIR / "industry_prompts.json"
 DEFAULT_PROMPTS_DIR = APP_DIR / "industry_prompts"
-CSDN_EDITOR_URL = "https://editor.csdn.net/md/"
+CSDN_CREATION_URL = "https://mp.csdn.net/mp_blog/creation/editor"
+CSDN_LEGACY_MD_URL = "https://editor.csdn.net/md/"
+CSDN_EDITOR_URL = CSDN_CREATION_URL
+CSDN_CDP_DEFAULT_PORT = 9222
+CSDN_CDP_HOSTS = ["127.0.0.1", "localhost", "[::1]"]
+CSDN_COOKIE_URLS = [
+    "https://www.csdn.net/",
+    "https://blog.csdn.net/",
+    "https://mp.csdn.net/",
+    CSDN_CREATION_URL,
+    CSDN_LEGACY_MD_URL,
+    "https://passport.csdn.net/",
+    "https://imgservice.csdn.net/direct/v1.0/image/obs/upload",
+    "https://imgservice.csdn.net/v1/image/direct/upload/signature",
+]
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config["MAX_CONTENT_LENGTH"] = 300 * 1024 * 1024
@@ -416,8 +435,18 @@ def friendly_cli_error(raw: str, fallback: str = "飞书 CLI 执行失败") -> s
         return raw.strip() or fallback
     code = error.get("code")
     message = error.get("message") or fallback
+    missing_scopes = error.get("missing_scopes") or []
     hint = ""
-    if code == 330004:
+    if error.get("subtype") == "missing_scope" and missing_scopes:
+        scope_text = " ".join(str(item) for item in missing_scopes)
+        if any(str(item).startswith("drive:") for item in missing_scopes):
+            hint = (
+                "这是飞书云空间文件能力缺权限，不是文档正文权限问题。请到“设置 → 飞书账号 → 高级权限编号”填入："
+                f"{scope_text}，重新生成企业账号授权链接并完成授权。"
+            )
+        else:
+            hint = f"请在飞书账号设置里的“高级权限编号”填入：{scope_text}，重新授权后再试。"
+    elif code == 330004:
         hint = "当前飞书账号没有这个文档的查看权限。请切换到有权限的账号，或让文档所有者授权。"
     elif code == 131005:
         hint = "飞书没有找到这个知识库节点。请确认链接是否完整、是否已分享给当前账号。"
@@ -448,6 +477,151 @@ def resolve_wiki_doc_url(doc_url: str, emit=None) -> tuple[str, str | None]:
             emit("知识库链接解析完成，已拿到真实文档 token。")
         return obj_token, None
     return doc_url, None
+
+
+def lark_url_path(value: str) -> str:
+    match = re.search(r"https?://[^/]+(?P<path>/[^\s?#]*)", value or "", flags=re.I)
+    return match.group("path") if match else ""
+
+
+def is_lark_file_url(value: str) -> bool:
+    return bool(re.search(r"/file/[^/?#\s]+", lark_url_path(value), flags=re.I))
+
+
+def extract_lark_file_token(value: str) -> str:
+    match = re.search(r"/file/(?P<token>[^/?#\s]+)", lark_url_path(value), flags=re.I)
+    if not match:
+        raise UserVisibleError("这不是飞书云空间文件链接。请粘贴 /file/ 开头的完整飞书文件链接。")
+    return unquote(match.group("token")).strip()
+
+
+def lark_file_scope_hint() -> str:
+    scopes = "drive:drive.metadata:readonly drive:file:download"
+    return (
+        "这是飞书云空间文件链接，不是在线文档链接。请在右上角“设置 → 飞书账号 → 高级权限编号”填入："
+        f"{scopes}，重新生成企业账号授权链接并完成授权；或者先把文件下载到本地，再从“本地文件”上传。"
+    )
+
+
+def safe_download_name(name: str, fallback: str) -> str:
+    cleaned = secure_filename(name or "")
+    if not cleaned:
+        cleaned = fallback
+    if len(cleaned) > 150:
+        stem = Path(cleaned).stem[:110] or fallback
+        suffix = Path(cleaned).suffix[:20]
+        cleaned = f"{stem}{suffix}"
+    return cleaned
+
+
+def find_nested_value(value: Any, keys: set[str]) -> Any:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in keys and item not in (None, ""):
+                return item
+        for item in value.values():
+            found = find_nested_value(item, keys)
+            if found not in (None, ""):
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = find_nested_value(item, keys)
+            if found not in (None, ""):
+                return found
+    return None
+
+
+def inspect_lark_file(doc_url: str, emit=None) -> dict[str, str]:
+    if emit:
+        emit("检测到飞书云空间文件链接，正在读取文件信息。")
+    completed = run_lark_cli(
+        ["drive", "+inspect", "--as", "user", "--url", doc_url, "--format", "json"],
+        timeout=120,
+    )
+    raw = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
+    if completed.returncode != 0:
+        detail = friendly_cli_error(raw, "飞书云空间文件信息读取失败")
+        if "missing_scope" in raw:
+            detail = f"{detail}\n\n{lark_file_scope_hint()}"
+        raise UserVisibleError(detail)
+    try:
+        data = parse_cli_json_any(raw)
+    except json.JSONDecodeError as exc:
+        raise UserVisibleError(f"飞书云空间文件信息返回内容不是标准 JSON：{exc}") from exc
+    token = str(
+        find_nested_value(data, {"file_token", "fileToken", "token", "doc_token", "obj_token", "objToken"})
+        or extract_lark_file_token(doc_url)
+    )
+    title = str(find_nested_value(data, {"title", "name", "file_name", "fileName"}) or token)
+    doc_type = str(find_nested_value(data, {"doc_type", "docType", "type", "obj_type", "objType"}) or "file")
+    return {"token": token, "title": title, "type": doc_type}
+
+
+def detect_download_suffix(path: Path) -> str:
+    head = path.read_bytes()[:16] if path.exists() else b""
+    if head.startswith(b"%PDF"):
+        return ".pdf"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if head.startswith(b"GIF8"):
+        return ".gif"
+    if head.startswith(b"RIFF") and b"WEBP" in head:
+        return ".webp"
+    if head.startswith(b"BM"):
+        return ".bmp"
+    if head.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        return ".doc"
+    if head.startswith(b"PK"):
+        try:
+            with zipfile.ZipFile(path) as archive:
+                names = set(archive.namelist())
+                if "[Content_Types].xml" in names and any(item.startswith("word/") for item in names):
+                    return ".docx"
+        except zipfile.BadZipFile:
+            pass
+    return ""
+
+
+def download_lark_file(doc_url: str, job_dir: Path, emit=None) -> tuple[Path, list[str]]:
+    meta = inspect_lark_file(doc_url, emit)
+    token = meta["token"]
+    title = meta["title"]
+    filename = safe_download_name(title, f"{token}.download")
+    target = job_dir / "input" / filename
+    if not target.suffix:
+        target = target.with_suffix(".download")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if emit:
+        emit(f"正在从飞书云空间下载文件：{title}")
+    completed = run_lark_cli(
+        ["drive", "+download", "--as", "user", "--file-token", token, "--output", str(target), "--overwrite"],
+        timeout=300,
+    )
+    raw = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
+    if completed.returncode != 0:
+        detail = friendly_cli_error(raw, "飞书云空间文件下载失败")
+        if "missing_scope" in raw:
+            detail = f"{detail}\n\n{lark_file_scope_hint()}"
+        raise UserVisibleError(detail)
+    if not target.exists() or not target.is_file():
+        raise UserVisibleError("飞书 CLI 显示下载完成，但本地没有找到下载后的文件。请重试或改用本地上传。")
+    detected_suffix = detect_download_suffix(target)
+    if detected_suffix and target.suffix.lower() in {"", ".download", ".bin"}:
+        renamed = target.with_suffix(detected_suffix)
+        if renamed.exists():
+            renamed = target.with_name(f"{target.stem}_{uuid.uuid4().hex[:8]}{detected_suffix}")
+        target.rename(renamed)
+        target = renamed
+    if target.suffix.lower() not in {".md", ".markdown", ".html", ".htm", ".docx", ".doc", ".pdf", *IMAGE_SUFFIXES}:
+        raise UserVisibleError(
+            f"飞书文件已下载，但当前工具暂不支持这个文件类型：{target.name}。请先另存为 Word、PDF、Markdown、HTML 或图片后再上传。"
+        )
+    if emit:
+        emit(f"飞书云空间文件已下载：{target.name}。接下来按本地文件继续处理。")
+    notice = "来源是飞书云空间文件，已先下载到本地临时任务目录再处理。"
+    return target, [notice]
 
 
 def fetch_lark_markdown(doc_url: str, emit=None) -> tuple[str, list[str]]:
@@ -611,6 +785,8 @@ def combine_saved_files(saved_files: list[Path], job_dir: Path) -> Path:
 
     # If an article file and its referenced images are uploaded together, render only the article.
     # The image files stay beside it so relative links can be resolved without duplicating images.
+    for document_file in document_files:
+        copy_relative_image_assets(document_file, input_dir)
     fragments = [file_to_html(path, media_dir) for path in files_to_render]
 
     source = input_dir / "uploaded_source.html"
@@ -619,6 +795,30 @@ def combine_saved_files(saved_files: list[Path], job_dir: Path) -> Path:
     html_doc += "\n</body></html>\n"
     write_text(source, html_doc)
     return source
+
+
+def copy_relative_image_assets(document_path: Path, input_dir: Path) -> None:
+    if document_path.suffix.lower() not in {".md", ".markdown", ".html", ".htm"}:
+        return
+
+    content = read_text(document_path)
+    doc_dir = document_path.parent
+    input_root = input_dir.resolve()
+    for ref in collect_image_refs(content):
+        if not looks_like_image(ref) or is_data_image(ref) or is_url(ref):
+            continue
+        cleaned = unquote(ref.split("#", 1)[0].split("?", 1)[0]).strip()
+        if not cleaned:
+            continue
+        destination = (input_dir / cleaned).resolve()
+        if destination == input_root or input_root not in destination.parents:
+            continue
+        local_path = resolve_local_image(ref, doc_dir)
+        if not local_path or not local_path.is_file():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if not destination.exists() or local_path.resolve() != destination:
+            shutil.copy2(local_path, destination)
 
 
 def combine_uploaded_files(files: list[Any], job_dir: Path) -> Path:
@@ -729,7 +929,9 @@ def result_payload(
     report_json_path = output_path.parent / "report.json"
     report = read_text(report_path) if report_path.exists() else ""
     report_data = json.loads(read_text(report_json_path)) if report_json_path.exists() else {"images": []}
-    clipboard_html = inline_images_for_clipboard(content, output_path)
+    # Keep result payload light. Large articles with dozens of screenshots can
+    # produce multi-megabyte data-URI HTML, which makes restore/copy brittle.
+    clipboard_html = content if output_path.suffix.lower() in {".html", ".htm"} else markdown_to_clipboard_html(content)
     zip_path = make_zip(job_dir)
     if persist:
         write_job_meta(job_dir, output_path, source_label, notices)
@@ -790,48 +992,639 @@ def cpa_headers(api_key: str) -> dict[str, str]:
     return {"authorization": f"Bearer {api_key}", "content-type": "application/json"}
 
 
-def try_read_csdn_cookie() -> str:
+SUPPORTED_COOKIE_BROWSERS = {
+    "chrome": {
+        "label": "Google Chrome",
+    },
+    "edge": {
+        "label": "Microsoft Edge",
+    },
+}
+
+
+def cookie_browser_label(browser: str) -> str:
+    return SUPPORTED_COOKIE_BROWSERS.get(browser, SUPPORTED_COOKIE_BROWSERS["chrome"])["label"]
+
+
+def normalize_cookie_browser(browser: str | None) -> str:
+    value = (browser or "chrome").strip().lower()
+    return value if value in SUPPORTED_COOKIE_BROWSERS else "chrome"
+
+
+def powershell_quote(value: str | Path) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def normalize_cdp_port(value: Any) -> int:
+    if value in (None, ""):
+        return CSDN_CDP_DEFAULT_PORT
     try:
-        import browser_cookie3  # type: ignore
-    except Exception as exc:  # noqa: BLE001
-        raise UserVisibleError("当前环境还缺少自动读取浏览器 Cookie 的组件，请先运行依赖安装，或按页面里的手动引导获取。") from exc
+        port = int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise UserVisibleError("DevTools 端口必须是数字，例如 9222。") from exc
+    if not 1 <= port <= 65535:
+        raise UserVisibleError("DevTools 端口必须在 1 到 65535 之间。")
+    return port
 
-    def friendly_cookie_error(browser: str, exc: Exception) -> str:
-        message = str(exc)
-        lower = message.lower()
-        if "requires admin" in lower or "run as admin" in lower:
-            return f"{browser}: Windows 当前不允许读取加密 Cookie，可以用管理员方式启动本工具，或按页面手动引导复制。"
-        if "profile" in lower:
-            return f"{browser}: 没找到这个浏览器的用户数据。"
-        if "permission" in lower or "access" in lower:
-            return f"{browser}: 没有读取权限，可以关闭浏览器后重试，或按页面手动引导复制。"
-        return f"{browser}: {message}"
 
-    pairs: dict[str, str] = {}
+def cdp_json_for_host(host: str, port: int, path: str, method: str = "GET", timeout: float = 3) -> Any:
+    response = requests.request(method, f"http://{host}:{port}{path}", timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def cdp_json(port: int, path: str, method: str = "GET", timeout: float = 3) -> Any:
     errors: list[str] = []
-    loaders = [
-        ("Edge", getattr(browser_cookie3, "edge", None)),
-        ("Chrome", getattr(browser_cookie3, "chrome", None)),
-        ("Firefox", getattr(browser_cookie3, "firefox", None)),
-    ]
-    for name, loader in loaders:
-        if not callable(loader):
-            continue
+    for host in CSDN_CDP_HOSTS:
         try:
-            jar = loader(domain_name=".csdn.net")
-            for cookie in jar:
-                if "csdn.net" in (cookie.domain or ""):
-                    pairs[cookie.name] = cookie.value
+            return cdp_json_for_host(host, port, path, method=method, timeout=timeout)
         except Exception as exc:  # noqa: BLE001
-            errors.append(friendly_cookie_error(name, exc))
+            errors.append(f"{host}: {type(exc).__name__}: {exc}")
+    raise UserVisibleError("没有连上 CSDN 调试浏览器。连接细节：" + "；".join(errors[:3]))
 
-    if not pairs:
-        detail = "；".join(errors[:2])
+
+def iter_cdp_targets(port: int, timeout: float = 1) -> list[tuple[str, list[dict[str, Any]]]]:
+    found: list[tuple[str, list[dict[str, Any]]]] = []
+    for host in CSDN_CDP_HOSTS:
+        try:
+            targets = cdp_json_for_host(host, port, "/json/list", timeout=timeout)
+        except Exception:
+            continue
+        if isinstance(targets, list):
+            found.append((host, [item for item in targets if isinstance(item, dict)]))
+    return found
+
+
+def target_is_csdn_page(item: dict[str, Any]) -> bool:
+    return (
+        item.get("type") == "page"
+        and item.get("webSocketDebuggerUrl")
+        and "csdn.net" in str(item.get("url") or "")
+    )
+
+
+def resolve_csdn_cdp_port(value: Any = None) -> int:
+    preferred = normalize_cdp_port(value)
+    candidates = [preferred] + [port for port in range(9222, 9231) if port != preferred]
+    for port in candidates:
+        host_targets = iter_cdp_targets(port, timeout=0.8)
+        if any(target_is_csdn_page(item) for _, targets in host_targets for item in targets):
+            return port
+        if any(item.get("type") == "page" and item.get("webSocketDebuggerUrl") for _, targets in host_targets for item in targets):
+            return port
+    raise UserVisibleError("没有找到已打开的 CSDN 自动浏览器。请先点“打开 CSDN 自动浏览器”，并完成登录。")
+
+
+def cdp_page_websocket_url(port: int) -> str:
+    host_targets = iter_cdp_targets(port, timeout=2)
+    if not host_targets:
         raise UserVisibleError(
-            "没有从本机浏览器读到 CSDN 登录 Cookie。请先确认 Chrome/Edge 已登录 CSDN；如果自动读取仍失败，请按页面下方手动引导复制。"
-            + (f"\n读取细节：{detail}" if detail else "")
+            "没有连上 CSDN 调试浏览器。请先点“打开 CSDN 自动浏览器”，在打开的浏览器里登录 CSDN，"
+            "然后再点“检查自动登录”。"
         )
-    return "; ".join(f"{name}={value}" for name, value in sorted(pairs.items()))
+    for _, targets in host_targets:
+        for item in targets:
+            if target_is_csdn_page(item):
+                return str(item["webSocketDebuggerUrl"])
+    for _, targets in host_targets:
+        for item in targets:
+            if item.get("type") == "page" and item.get("webSocketDebuggerUrl"):
+                return str(item["webSocketDebuggerUrl"])
+
+    encoded = quote(CSDN_CREATION_URL, safe="")
+    for host, _ in host_targets:
+        for method in ("PUT", "GET"):
+            try:
+                created = cdp_json_for_host(host, port, f"/json/new?{encoded}", method=method)
+                ws_url = created.get("webSocketDebuggerUrl") if isinstance(created, dict) else None
+                if ws_url:
+                    return str(ws_url)
+            except Exception:
+                continue
+    raise UserVisibleError("调试浏览器已打开，但没有找到可操作的页面。请在该浏览器里打开 CSDN 后重试。")
+
+
+def websocket_origin(ws_url: str) -> str:
+    parsed = urlparse(ws_url)
+    return f"http://{parsed.netloc}" if parsed.netloc else f"http://localhost:{CSDN_CDP_DEFAULT_PORT}"
+
+
+def cdp_cookie_header_from_cookies(cookies: list[dict[str, Any]]) -> str:
+    chosen: dict[str, tuple[int, int, str]] = {}
+    order = 0
+    for cookie in cookies:
+        if not isinstance(cookie, dict):
+            continue
+        domain = str(cookie.get("domain") or "").lower()
+        name = str(cookie.get("name") or "").strip()
+        value = str(cookie.get("value") or "")
+        if not name or "csdn.net" not in domain:
+            continue
+        score = 0
+        if name.lower() in CSDN_STRONG_AUTH_COOKIE_NAMES:
+            score += 100
+        if domain == ".csdn.net":
+            score += 20
+        elif domain.endswith(".csdn.net"):
+            score += 10
+        score += min(len(str(cookie.get("path") or "")), 20)
+        if name not in chosen or score > chosen[name][0]:
+            chosen[name] = (score, order, f"{name}={value}")
+        order += 1
+    return "; ".join(item for _, _, item in sorted(chosen.values(), key=lambda entry: entry[1]))
+
+
+def read_csdn_cookie_from_cdp(port: int = CSDN_CDP_DEFAULT_PORT) -> str:
+    port = resolve_csdn_cdp_port(port)
+    try:
+        import websocket  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        raise UserVisibleError("缺少浏览器调试连接组件，请重新启动工具让它安装依赖。") from exc
+
+    ws_url = cdp_page_websocket_url(port)
+    try:
+        ws = websocket.create_connection(ws_url, timeout=8, origin=websocket_origin(ws_url))
+    except Exception as exc:  # noqa: BLE001
+        raise UserVisibleError(
+            "已经找到调试浏览器，但连接被浏览器拒绝。请用页面上的“打开 CSDN 登录浏览器”按钮重新打开，"
+            "登录后再读取。"
+        ) from exc
+
+    message_id = 0
+
+    def send_cdp(method: str, params: dict[str, Any] | None = None, timeout: float = 8) -> dict[str, Any]:
+        nonlocal message_id
+        message_id += 1
+        ws.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            ws.settimeout(max(0.1, deadline - time.monotonic()))
+            raw = ws.recv()
+            payload = json.loads(raw)
+            if payload.get("id") != message_id:
+                continue
+            if payload.get("error"):
+                error = payload["error"]
+                raise UserVisibleError(str(error.get("message") or error))
+            return payload.get("result") or {}
+        raise UserVisibleError("等待调试浏览器返回 Cookie 超时，请确认 CSDN 页面已经打开并完成登录。")
+
+    try:
+        send_cdp("Network.enable", timeout=5)
+        result = send_cdp("Network.getCookies", {"urls": CSDN_COOKIE_URLS}, timeout=8)
+        cookies = result.get("cookies") if isinstance(result, dict) else []
+        if not cookies:
+            try:
+                result = send_cdp("Storage.getCookies", timeout=8)
+                cookies = result.get("cookies") if isinstance(result, dict) else []
+            except Exception:
+                cookies = []
+        cookie_header = cdp_cookie_header_from_cookies(cookies if isinstance(cookies, list) else [])
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+
+    if not cookie_header:
+        raise UserVisibleError(
+            "调试浏览器里没有读到 CSDN Cookie。请确认刚打开的浏览器已经登录 CSDN，并至少打开过一次 CSDN 首页或创作中心。"
+        )
+    return cookie_header
+
+
+def cdp_runtime_evaluate(port: int, expression: str, timeout: float = 120) -> Any:
+    port = resolve_csdn_cdp_port(port)
+    try:
+        import websocket  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        raise UserVisibleError("缺少浏览器调试连接组件，请重新启动工具让它安装依赖，或先使用普通复制。") from exc
+
+    ws_url = cdp_page_websocket_url(port)
+    try:
+        ws = websocket.create_connection(ws_url, timeout=8, origin=websocket_origin(ws_url))
+    except Exception as exc:  # noqa: BLE001
+        raise UserVisibleError("已经找到 CSDN 登录浏览器，但连接被拒绝。请重新打开登录浏览器后再试。") from exc
+
+    message_id = 1
+    try:
+        ws.send(
+            json.dumps(
+                {
+                    "id": message_id,
+                    "method": "Runtime.evaluate",
+                    "params": {
+                        "expression": expression,
+                        "awaitPromise": True,
+                        "returnByValue": True,
+                        "timeout": int(timeout * 1000),
+                    },
+                }
+            )
+        )
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            ws.settimeout(max(0.1, deadline - time.monotonic()))
+            payload = json.loads(ws.recv())
+            if payload.get("id") != message_id:
+                continue
+            if payload.get("error"):
+                error = payload["error"]
+                raise UserVisibleError(str(error.get("message") or error))
+            if payload.get("exceptionDetails"):
+                detail = payload["exceptionDetails"]
+                text = detail.get("text") or detail.get("exception", {}).get("description") or detail
+                raise UserVisibleError(f"CSDN 页面执行上传失败：{text}")
+            result = payload.get("result") or {}
+            remote_value = result.get("result") if isinstance(result, dict) else {}
+            if isinstance(remote_value, dict) and remote_value.get("subtype") == "error":
+                raise UserVisibleError(str(remote_value.get("description") or "CSDN 页面执行上传失败。"))
+            return remote_value.get("value") if isinstance(remote_value, dict) else None
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
+    raise UserVisibleError("等待 CSDN 登录浏览器上传图片超时。")
+
+
+def csdn_upload_image_via_browser(port: int, image_path: Path) -> str:
+    if not image_path.exists():
+        raise UserVisibleError(f"图片不存在：{image_path.name}")
+    mime = mime_for_path(image_path)
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    payload = json.dumps({"name": image_path.name, "mime": mime, "base64": encoded}, ensure_ascii=False)
+    expression = f"""
+(async () => {{
+  const input = {payload};
+  function base64ToBlob(base64, mime) {{
+    const binary = atob(base64);
+    const chunkSize = 32768;
+    const chunks = [];
+    for (let offset = 0; offset < binary.length; offset += chunkSize) {{
+      const slice = binary.slice(offset, offset + chunkSize);
+      const bytes = new Uint8Array(slice.length);
+      for (let i = 0; i < slice.length; i += 1) bytes[i] = slice.charCodeAt(i);
+      chunks.push(bytes);
+    }}
+    return new Blob(chunks, {{ type: mime }});
+  }}
+  if (!window.csdn || !window.csdn.upload || typeof window.csdn.upload.uploadImg !== "function") {{
+    throw new Error("CSDN 上传组件还没有加载完成。请确认登录浏览器停留在 CSDN 创作页，然后重试。");
+  }}
+  const blob = base64ToBlob(input.base64, input.mime);
+  const file = new File([blob], input.name, {{ type: input.mime }});
+  const response = await window.csdn.upload.uploadImg({{
+    appName: "direct_blog",
+    type: "blog",
+    imageTemplate: "",
+    file,
+  }});
+  const first = Array.isArray(response) ? response[0] : response;
+  const data = first && first.data && first.data.data ? first.data.data : first && first.data ? first.data : first;
+  return {{ ok: true, response, imageUrl: data && (data.imageUrl || data.url || data.imgUrl || data.location || data.src) }};
+}})()
+"""
+    result = cdp_runtime_evaluate(port, expression, timeout=180)
+    image_url = find_first_url(result)
+    if not image_url:
+        raise UserVisibleError("CSDN 页面上传图片成功返回异常，没有找到图片地址。")
+    return image_url
+
+
+def csdn_browser_upload_status(port: int) -> dict[str, Any]:
+    expression = """
+(() => ({
+  href: location.href,
+  title: document.title,
+  hasCsdnUpload: Boolean(window.csdn && window.csdn.upload && typeof window.csdn.upload.uploadImg === "function"),
+}))()
+"""
+    value = cdp_runtime_evaluate(port, expression, timeout=30)
+    if not isinstance(value, dict):
+        value = {}
+    return value
+
+
+def build_csdn_editor_injection_script(title: str, markdown_body: str, html_body: str | None = None) -> str:
+    payload = json.dumps(
+        {
+            "title": title or "",
+            "markdown": markdown_body or "",
+            "html": html_body or markdown_to_clipboard_html(markdown_body or ""),
+            "url": CSDN_CREATION_URL,
+        },
+        ensure_ascii=False,
+    )
+    return f"""
+(async () => {{
+  const input = {payload};
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const visible = (el) => {{
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return rect.width > 20 && rect.height > 10 && style.visibility !== "hidden" && style.display !== "none";
+  }};
+  const fire = (el) => {{
+    for (const name of ["input", "change", "keyup", "blur"]) {{
+      el.dispatchEvent(new Event(name, {{ bubbles: true }}));
+    }}
+  }};
+  const setNativeValue = (el, value) => {{
+    const proto = Object.getPrototypeOf(el);
+    const descriptor = Object.getOwnPropertyDescriptor(proto, "value")
+      || Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+      || Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+    if (descriptor && descriptor.set) descriptor.set.call(el, value);
+    else el.value = value;
+    fire(el);
+  }};
+  const cleanText = (text) => String(text || "").replace(/\\s+/g, " ").trim();
+  const titleSelectors = [
+    "input[placeholder*='标题']",
+    "textarea[placeholder*='标题']",
+    "input#txtTitle",
+    "input[name='title']",
+    ".article-title input",
+    ".editor-title input",
+    ".title-input input"
+  ];
+  function setTitle() {{
+    if (!input.title) return {{ ok: false, skipped: true }};
+    const candidates = [];
+    for (const selector of titleSelectors) {{
+      candidates.push(...document.querySelectorAll(selector));
+    }}
+    const target = candidates.find(visible);
+    if (!target) return {{ ok: false }};
+    setNativeValue(target, input.title);
+    return {{ ok: true, selector: target.id ? `#${{target.id}}` : target.tagName.toLowerCase() }};
+  }}
+  function setByCkeditor() {{
+    const instances = window.CKEDITOR && window.CKEDITOR.instances ? Object.values(window.CKEDITOR.instances) : [];
+    for (const instance of instances) {{
+      if (instance && typeof instance.setData === "function") {{
+        instance.setData(input.html);
+        if (typeof instance.updateElement === "function") instance.updateElement();
+        return {{ ok: true, method: "CKEditor" }};
+      }}
+    }}
+    return {{ ok: false }};
+  }}
+  function setByCkeIframe() {{
+    const frames = Array.from(document.querySelectorAll("iframe.cke_wysiwyg_frame, #cke_editor iframe"));
+    for (const frame of frames) {{
+      try {{
+        if (!visible(frame)) continue;
+        const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+        const target = doc && doc.body;
+        if (!target) continue;
+        target.innerHTML = input.html;
+        target.dispatchEvent(new Event("input", {{ bubbles: true }}));
+        target.dispatchEvent(new Event("change", {{ bubbles: true }}));
+        return {{ ok: true, method: "CKEditor iframe" }};
+      }} catch (err) {{
+        // Cross-origin or not ready; try the next strategy.
+      }}
+    }}
+    return {{ ok: false }};
+  }}
+  function setByCodeMirror() {{
+    for (const el of document.querySelectorAll(".CodeMirror")) {{
+      if (visible(el) && el.CodeMirror && typeof el.CodeMirror.setValue === "function") {{
+        el.CodeMirror.setValue(input.markdown);
+        if (typeof el.CodeMirror.refresh === "function") el.CodeMirror.refresh();
+        return {{ ok: true, method: "CodeMirror" }};
+      }}
+    }}
+    return {{ ok: false }};
+  }}
+  function setByMonaco() {{
+    const monacoEditor = window.monaco && window.monaco.editor;
+    const editors = monacoEditor && typeof monacoEditor.getEditors === "function" ? monacoEditor.getEditors() : [];
+    if (editors && editors.length && typeof editors[0].setValue === "function") {{
+      editors[0].setValue(input.markdown);
+      return {{ ok: true, method: "Monaco" }};
+    }}
+    return {{ ok: false }};
+  }}
+  function setByTextarea() {{
+    const textareas = Array.from(document.querySelectorAll("textarea"))
+      .filter(el => {{
+        if (!visible(el)) return false;
+        const label = el.placeholder || el.name || el.id || "";
+        if (/标题|title|摘要|概要|summary|标签|tag|分类|category/i.test(label)) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 400 && rect.height > 180;
+      }})
+      .sort((a, b) => (b.getBoundingClientRect().width * b.getBoundingClientRect().height) - (a.getBoundingClientRect().width * a.getBoundingClientRect().height));
+    const target = textareas[0];
+    if (!target) return {{ ok: false }};
+    setNativeValue(target, input.markdown);
+    return {{ ok: true, method: "textarea" }};
+  }}
+  function setByContentEditable() {{
+    const editables = Array.from(document.querySelectorAll("[contenteditable='true'], [contenteditable='plaintext-only']"))
+      .filter(visible)
+      .sort((a, b) => (b.getBoundingClientRect().width * b.getBoundingClientRect().height) - (a.getBoundingClientRect().width * a.getBoundingClientRect().height));
+    const target = editables.find(el => !/标题|title/i.test(cleanText(el.getAttribute("aria-label") || el.getAttribute("placeholder") || "")));
+    if (!target) return {{ ok: false }};
+    target.focus();
+    target.innerHTML = input.html;
+    fire(target);
+    return {{ ok: true, method: "contenteditable" }};
+  }}
+  function trySetKnownWindowEditor() {{
+    const seen = new Set();
+    for (const key of Object.keys(window)) {{
+      if (!/editor|markdown|md/i.test(key)) continue;
+      const candidate = window[key];
+      if (!candidate || seen.has(candidate)) continue;
+      seen.add(candidate);
+      for (const method of ["setValue", "setMarkdown", "setContent", "insertValue"]) {{
+        if (typeof candidate[method] === "function") {{
+          candidate[method](method.toLowerCase().includes("markdown") ? input.markdown : input.html);
+          return {{ ok: true, method: `window.${{key}}.${{method}}` }};
+        }}
+      }}
+    }}
+    return {{ ok: false }};
+  }}
+  function injectBody() {{
+    for (const setter of [setByCkeditor, setByCkeIframe, setByCodeMirror, setByMonaco, trySetKnownWindowEditor, setByTextarea, setByContentEditable]) {{
+      const result = setter();
+      if (result && result.ok) return result;
+    }}
+    return {{ ok: false }};
+  }}
+  function readyHint() {{
+    return {{
+      href: location.href,
+      title: document.title,
+      codeMirror: document.querySelectorAll(".CodeMirror").length,
+      textarea: document.querySelectorAll("textarea").length,
+      contenteditable: document.querySelectorAll("[contenteditable='true'], [contenteditable='plaintext-only']").length,
+      bodyText: cleanText(document.body ? document.body.innerText : "").slice(0, 160)
+    }};
+  }}
+  if (!/csdn\\.net/i.test(location.hostname)) {{
+    location.href = input.url;
+    await sleep(4000);
+  }}
+  const deadline = Date.now() + 90000;
+  let titleResult = {{ ok: false }};
+  let bodyResult = {{ ok: false }};
+  let lastHint = readyHint();
+  while (Date.now() < deadline) {{
+    if (!/login|passport/i.test(location.href)) {{
+      titleResult = setTitle();
+      bodyResult = injectBody();
+      if (bodyResult && bodyResult.ok) {{
+        return {{
+          ok: true,
+          pageUrl: location.href,
+          titleSet: Boolean(titleResult && (titleResult.ok || titleResult.skipped)),
+          bodyLength: input.markdown.length,
+          method: bodyResult.method,
+          hint: readyHint()
+        }};
+      }}
+    }}
+    lastHint = readyHint();
+    await sleep(800);
+  }}
+  throw new Error("没有找到可写入的 CSDN 正文编辑区。请确认自动浏览器已经登录并停留在创作编辑页。" + JSON.stringify(lastHint));
+}})()
+"""
+
+
+def navigate_csdn_editor(port: int) -> None:
+    expression = f"""
+(() => {{
+  if (!/csdn\\.net/i.test(location.hostname) || !/mp_blog\\/creation\\/editor|editor\\.csdn\\.net\\/md/i.test(location.href)) {{
+    location.href = {json.dumps(CSDN_CREATION_URL)};
+    return {{ navigated: true, href: location.href }};
+  }}
+  return {{ navigated: false, href: location.href }};
+}})()
+"""
+    try:
+        cdp_runtime_evaluate(port, expression, timeout=20)
+    except UserVisibleError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise UserVisibleError(f"打开 CSDN 创作页失败：{exc}") from exc
+
+
+def write_csdn_editor_via_browser(port: int, title: str, body: str, html_body: str | None = None) -> dict[str, Any]:
+    if not body.strip():
+        raise UserVisibleError("没有可写入 CSDN 的正文内容。")
+    port = resolve_csdn_cdp_port(port)
+    navigate_csdn_editor(port)
+    result = cdp_runtime_evaluate(port, build_csdn_editor_injection_script(title, body, html_body), timeout=120)
+    if not isinstance(result, dict) or not result.get("ok"):
+        raise UserVisibleError("CSDN 编辑器写入失败：没有收到成功确认。")
+    return result
+
+
+def browser_executable(browser: str) -> Path | None:
+    browser = normalize_cookie_browser(browser)
+    names = ["chrome.exe", "chrome"] if browser == "chrome" else ["msedge.exe", "msedge"]
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    env = {name: os.environ.get(name) for name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")}
+    candidates = (
+        [
+            Path(env["PROGRAMFILES"] or "") / "Google" / "Chrome" / "Application" / "chrome.exe",
+            Path(env["PROGRAMFILES(X86)"] or "") / "Google" / "Chrome" / "Application" / "chrome.exe",
+            Path(env["LOCALAPPDATA"] or "") / "Google" / "Chrome" / "Application" / "chrome.exe",
+        ]
+        if browser == "chrome"
+        else [
+            Path(env["PROGRAMFILES"] or "") / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+            Path(env["PROGRAMFILES(X86)"] or "") / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+            Path(env["LOCALAPPDATA"] or "") / "Microsoft" / "Edge" / "Application" / "msedge.exe",
+        ]
+    )
+    return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
+def csdn_debug_profile_dir(browser: str) -> Path:
+    base = Path(os.environ.get("LOCALAPPDATA") or RUNS_DIR)
+    return base / "CSDNImageRedactor" / "debug-browser-profiles" / normalize_cookie_browser(browser)
+
+
+def wait_csdn_debug_browser(port: int, timeout: float = 20) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    encoded = quote(CSDN_CREATION_URL, safe="")
+    tried_open = False
+    last_valid: dict[str, Any] | None = None
+    while time.monotonic() < deadline:
+        host_targets = iter_cdp_targets(port, timeout=1)
+        for host, targets in host_targets:
+            if targets:
+                last_valid = {
+                    "cdpHost": host,
+                    "targetCount": len(targets),
+                    "pageUrl": str((next((item for item in targets if target_is_csdn_page(item)), targets[0])).get("url") or ""),
+                }
+            for item in targets:
+                if target_is_csdn_page(item):
+                    return {
+                        "cdpHost": host,
+                        "targetCount": len(targets),
+                        "pageUrl": str(item.get("url") or ""),
+                    }
+        if host_targets and not tried_open:
+            for host, _ in host_targets:
+                for method in ("PUT", "GET"):
+                    try:
+                        cdp_json_for_host(host, port, f"/json/new?{encoded}", method=method, timeout=2)
+                        tried_open = True
+                        break
+                    except Exception:
+                        continue
+                if tried_open:
+                    break
+        time.sleep(0.5)
+    if last_valid:
+        return last_valid
+    raise UserVisibleError(
+        "CSDN 浏览器窗口已尝试打开，但后台调试端口还没有响应。请关闭刚打开的 CSDN 自动浏览器窗口后再点一次。"
+    )
+
+
+def open_csdn_debug_browser(browser: str, port: int) -> dict[str, Any]:
+    browser = normalize_cookie_browser(browser)
+    port = normalize_cdp_port(port)
+    exe = browser_executable(browser)
+    if not exe:
+        raise UserVisibleError(f"没有找到 {cookie_browser_label(browser)}，请先安装 Chrome。")
+    profile_dir = csdn_debug_profile_dir(browser)
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    args = [
+        str(exe),
+        f"--remote-debugging-address=127.0.0.1",
+        f"--remote-debugging-port={port}",
+        "--remote-allow-origins=*",
+        f"--user-data-dir={profile_dir}",
+        "--no-first-run",
+        "--new-window",
+        CSDN_CREATION_URL,
+    ]
+    subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    debug_state = wait_csdn_debug_browser(port, timeout=25)
+    return {
+        "browser": browser,
+        "browserName": cookie_browser_label(browser),
+        "port": port,
+        **debug_state,
+        "profileDir": str(profile_dir),
+        "url": CSDN_CREATION_URL,
+    }
 
 
 def get_report_json_path(job_dir: Path) -> Path:
@@ -1065,87 +1858,188 @@ def find_first_url(value: Any) -> str | None:
     return None
 
 
-def csdn_upload_token(cookie: str, suffix: str) -> dict[str, Any]:
-    suffix = suffix.lstrip(".").lower() or "png"
-    response = requests.get(
-        "https://imgservice.csdn.net/direct/v1.0/image/obs/upload",
-        params={
-            "type": "blog",
-            "rtype": "blog_picture",
-            "x-image-template": "standard",
-            "x-image-app": "direct_blog",
-            "x-image-dir": "direct",
-            "x-image-suffix": suffix,
-        },
-        headers={
-            "accept": "*/*",
-            "content-type": "application/json",
-            "origin": "https://mp.csdn.net",
-            "referer": "https://mp.csdn.net/mp_blog/creation/editor",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-            "cookie": cookie,
-        },
-        timeout=45,
-    )
-    response.raise_for_status()
-    data = response.json()
-    token = data.get("data") if isinstance(data, dict) else None
-    if not isinstance(token, dict):
-        raise UserVisibleError("CSDN 没有返回图片上传凭证，请检查 Cookie 是否有效。")
-    return token
+CSDN_STRONG_AUTH_COOKIE_NAMES = {
+    "usertoken",
+    "username",
+    "userinfo",
+    "usernick",
+    "au",
+    "dc_session_id",
+    "c_session_id",
+    "session",
+    "sessionid",
+}
 
 
-def csdn_upload_image(cookie: str, image_path: Path) -> str:
-    suffix = image_path.suffix.lower().lstrip(".") or "png"
-    token = csdn_upload_token(cookie, suffix)
-    custom = token.get("customParam") or {}
-    fields = {
-        "key": token.get("filePath", ""),
-        "policy": token.get("policy", ""),
-        "AccessKeyId": token.get("accessId", ""),
-        "signature": token.get("signature", ""),
-        "callbackUrl": token.get("callbackUrl", ""),
-        "callbackBody": token.get("callbackBody", ""),
-        "callbackBodyType": token.get("callbackBodyType", ""),
-        "x:rtype": custom.get("rtype", "blog_picture"),
-        "x:watermark": custom.get("watermark") or custom.get("rtype", "blog_picture"),
-        "x:templateName": custom.get("templateName") or custom.get("rtype", "blog_picture"),
-        "x:filePath": token.get("filePath", ""),
-        "x:isAudit": custom.get("isAudit", "false"),
-        "x:x-image-app": custom.get("x-image-app", "direct_blog"),
-        "x:type": custom.get("type", "blog"),
-        "x:x-image-suffix": custom.get("x-image-suffix", suffix),
-        "x:username": custom.get("username", ""),
+def cookie_pairs_from_header(cookie: str) -> dict[str, str]:
+    pairs: dict[str, str] = {}
+    for item in (cookie or "").split(";"):
+        item = item.strip()
+        if not item or "=" not in item:
+            continue
+        name, value = item.split("=", 1)
+        name = name.strip()
+        if name:
+            pairs[name] = value.strip()
+    return pairs
+
+
+def analyze_csdn_cookie_input(value: str) -> dict[str, Any]:
+    cookie = (value or "").strip()
+    pairs = cookie_pairs_from_header(cookie)
+    lower_names = {name.lower() for name in pairs}
+    strong_names = sorted(name for name in pairs if name.lower() in CSDN_STRONG_AUTH_COOKIE_NAMES)
+    has_user_token = "usertoken" in lower_names
+
+    result: dict[str, Any] = {
+        "ok": True,
+        "inputKind": "cdp-cookie",
+        "cookie": cookie,
+        "cookieLength": len(cookie),
+        "cookieCount": len(pairs),
+        "strongAuthNames": strong_names,
+        "hasUserToken": has_user_token,
+        "looksIncomplete": False,
+        "message": "",
     }
-    mime = mime_for_path(image_path)
-    with image_path.open("rb") as handle:
-        response = requests.post(
-            "https://csdn-img-blog.obs.cn-north-4.myhuaweicloud.com/",
-            data=fields,
-            files={"file": (image_path.name, handle, mime)},
-            headers={
-                "accept": "application/json, text/javascript, */*; q=0.01",
-                "origin": "https://mp.csdn.net",
-                "referer": "https://mp.csdn.net/mp_blog/creation/editor",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-            },
-            timeout=120,
+    if not cookie or "=" not in cookie or not pairs:
+        result.update(
+            {
+                "ok": False,
+                "looksIncomplete": True,
+                "message": "CSDN 自动浏览器里没有读到有效登录态。请先在自动浏览器里登录 CSDN。",
+            }
         )
-    response.raise_for_status()
+        return result
+
+    if not strong_names:
+        result["ok"] = False
+        result["looksIncomplete"] = True
+        result["message"] = "CSDN 自动浏览器已连接，但没有读到完整登录凭证。请刷新创作页或重新登录 CSDN。"
+        return result
+
+    if not has_user_token:
+        result["ok"] = False
+        result["looksIncomplete"] = True
+        result["message"] = f"已识别到 {len(pairs)} 个 Cookie，但没有看到 UserToken。请在 CSDN 自动浏览器里重新登录。"
+        return result
+
+    result["message"] = f"CSDN 自动登录态完整，已识别到 {len(pairs)} 个 Cookie。"
+    return result
+
+
+def strip_title_tag(content: str) -> tuple[str, str]:
+    text = content or ""
+    match = re.match(r"^\s*<title>(.*?)</title>\s*", text, flags=re.I | re.S)
+    if not match:
+        return "", text
+    title = re.sub(r"\s+", " ", match.group(1)).strip()
+    body = text[match.end() :].lstrip()
+    return title, body
+
+
+def infer_article_title(content: str) -> str:
+    text = content or ""
+    title, _ = strip_title_tag(text)
+    if title:
+        return title[:100]
+    heading = re.search(r"^\s*#\s+(.+?)\s*$", text, flags=re.M)
+    if heading:
+        return re.sub(r"\s+", " ", heading.group(1)).strip()[:100]
+    if "<" in text and ">" in text:
+        soup = BeautifulSoup(text, "html.parser")
+        for selector in ("title", "h1", "h2"):
+            node = soup.find(selector)
+            value = node.get_text(" ", strip=True) if node else ""
+            if value:
+                return re.sub(r"\s+", " ", value).strip()[:100]
+    return ""
+
+
+def html_body_fragment(content: str) -> str:
+    text = content or ""
+    soup = BeautifulSoup(text, "html.parser")
+    body = soup.body
+    if body:
+        return "".join(str(item) for item in body.contents).strip()
+    return text.strip()
+
+
+def clean_clipboard_text(content: str) -> str:
+    _, body = strip_title_tag(content)
+    body = re.sub(
+        r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]+",
+        "[图片已脱敏，复制到 CSDN 时会自动替换为 CSDN 图片链接]",
+        body,
+    )
+    return body.strip() + ("\n" if body.strip() else "")
+
+
+def write_system_clipboard(text: str) -> None:
+    clipboard_dir = RUNS_DIR / ".clipboard"
+    clipboard_dir.mkdir(parents=True, exist_ok=True)
+    temp_path = clipboard_dir / f"{uuid.uuid4().hex}.txt"
+    write_text(temp_path, text)
+    command = f"Get-Content -LiteralPath {powershell_quote(temp_path)} -Raw -Encoding UTF8 | Set-Clipboard"
     try:
-        data = response.json()
-    except Exception as exc:  # noqa: BLE001
-        raise UserVisibleError(f"CSDN 图片上传返回内容无法解析：{response.text[:200]}") from exc
-    image_url = find_first_url(data)
-    if not image_url:
-        raise UserVisibleError("CSDN 图片已请求上传，但没有返回可用图片地址。")
-    return image_url
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            raise UserVisibleError((completed.stderr or completed.stdout or "系统剪贴板写入失败。").strip())
+    finally:
+        try:
+            temp_path.unlink()
+        except OSError:
+            pass
 
 
-def prepare_csdn_native(job_dir: Path, cookie: str) -> dict[str, Any]:
-    cookie = (cookie or "").strip()
-    if not cookie:
-        raise UserVisibleError("请先在设置里填写 CSDN Cookie，才能使用 CSDN 原生图片上传。")
+def result_has_local_images(content: str) -> bool:
+    refs = collect_image_refs(content or "")
+    return any(not ref.startswith("data:") and not re.match(r"^https?://", ref) for ref in refs)
+
+
+def prepare_csdn_copy_payload(job_dir: Path, cdp_port: Any = None) -> dict[str, Any]:
+    output_path = find_output_path(job_dir)
+    content = read_text(output_path)
+    if result_has_local_images(content):
+        result = prepare_csdn_native(job_dir, "", cdp_port)
+    else:
+        meta = read_json_file(job_dir / "job.json", {})
+        result = result_payload(job_dir, output_path, meta.get("source") or "文章", meta.get("notices") or [], persist=True)
+    copy_text = clean_clipboard_text(str(result.get("content") or ""))
+    if not copy_text:
+        raise UserVisibleError("没有可复制的文章内容。")
+    write_system_clipboard(copy_text)
+    title = infer_article_title(str(result.get("content") or ""))
+    result["copied"] = True
+    result["copiedLength"] = len(copy_text)
+    result["title"] = title
+    return result
+
+
+def prepare_csdn_editor_payload(job_dir: Path, cdp_port: Any = None) -> dict[str, Any]:
+    port = normalize_cdp_port(cdp_port)
+    result = prepare_csdn_copy_payload(job_dir, port)
+    title = str(result.get("title") or "")
+    body = clean_clipboard_text(str(result.get("content") or ""))
+    html_body = html_body_fragment(str(result.get("clipboardHtml") or markdown_to_clipboard_html(body)))
+    write_result = write_csdn_editor_via_browser(port, title, body, html_body)
+    result["csdnEditorWrite"] = write_result
+    result["editorUrl"] = write_result.get("pageUrl") or CSDN_CREATION_URL
+    return result
+
+
+def prepare_csdn_native(job_dir: Path, cookie: str = "", cdp_port: Any = None) -> dict[str, Any]:
+    port = normalize_cdp_port(cdp_port) if cdp_port not in (None, "") else None
+    if not port:
+        raise UserVisibleError("请先打开 CSDN 自动浏览器并完成登录，才能自动上传图片。")
     output_path = find_output_path(job_dir)
     output_dir = job_dir / "output"
     content = read_text(output_path)
@@ -1156,7 +2050,7 @@ def prepare_csdn_native(job_dir: Path, cookie: str) -> dict[str, Any]:
         candidate = (output_dir / ref).resolve()
         if not candidate.exists() or output_dir.resolve() not in candidate.parents:
             continue
-        url = csdn_upload_image(cookie, candidate)
+        url = csdn_upload_image_via_browser(port, candidate)
         replacements[ref] = url
         uploads.append({"ref": ref, "url": url})
     if not uploads:
@@ -1165,10 +2059,13 @@ def prepare_csdn_native(job_dir: Path, cookie: str) -> dict[str, Any]:
     ready_path = output_path.with_name(f"{output_path.stem}_csdn_ready{output_path.suffix}")
     write_text(ready_path, updated)
     meta = read_json_file(job_dir / "job.json", {})
+    source_label = meta.get("source") or "文章"
+    if "CSDN 原生图片" not in source_label:
+        source_label = f"{source_label} · CSDN 原生图片"
     result = result_payload(
         job_dir,
         ready_path,
-        f"{meta.get('source') or '文章'} · CSDN 原生图片",
+        source_label,
         meta.get("notices") or [],
         persist=True,
     )
@@ -1231,15 +2128,84 @@ def cpa_test():
         return json_error(f"测试连接失败：{exc}", 500)
 
 
-@app.get("/api/csdn/cookie")
-def csdn_cookie():
+@app.post("/api/csdn/debug-browser/open")
+def csdn_debug_browser_open():
     try:
-        cookie = try_read_csdn_cookie()
-        return jsonify({"ok": True, "cookie": cookie, "message": "已从本机浏览器读取到 CSDN Cookie。"})
+        payload = request.get_json(force=True, silent=False)
+        browser = normalize_cookie_browser(payload.get("browser"))
+        port = normalize_cdp_port(payload.get("port"))
+        data = open_csdn_debug_browser(browser, port)
+        return jsonify(
+            {
+                "ok": True,
+                **data,
+                "message": (
+                    f"已打开 {data['browserName']} 的 CSDN 登录浏览器。请在新窗口里登录 CSDN，"
+                    "登录完成后回到本工具点击“检查自动登录”。"
+                ),
+            }
+        )
     except UserVisibleError as exc:
         return json_error(str(exc), 400)
     except Exception as exc:  # noqa: BLE001
-        return json_error(f"读取 CSDN Cookie 失败：{exc}", 500)
+        return json_error(f"打开 CSDN 登录浏览器失败：{exc}", 500)
+
+
+@app.post("/api/csdn/cookie/cdp")
+def csdn_cookie_cdp():
+    try:
+        payload = request.get_json(force=True, silent=False)
+        port = normalize_cdp_port(payload.get("port"))
+        cookie = read_csdn_cookie_from_cdp(port)
+        analysis = analyze_csdn_cookie_input(cookie)
+        return jsonify(
+            {
+                "ok": True,
+                "cookie": cookie,
+                "analysis": analysis,
+                "message": (
+                    f"已从登录浏览器读取到 {analysis.get('cookieCount') or 0} 个 CSDN Cookie。"
+                    "建议继续点击“检查上传组件”。"
+                ),
+            }
+        )
+    except UserVisibleError as exc:
+        return json_error(str(exc), 400)
+    except requests.RequestException as exc:
+        return json_error(f"连接调试浏览器失败：{exc}", 400)
+    except Exception as exc:  # noqa: BLE001
+        return json_error(f"读取登录浏览器 Cookie 失败：{exc}", 500)
+
+
+@app.post("/api/csdn/cookie/test")
+def csdn_cookie_test():
+    try:
+        payload = request.get_json(force=True, silent=False)
+        cdp_port = payload.get("cdpPort")
+        if cdp_port in (None, ""):
+            raise UserVisibleError("请先打开 CSDN 自动浏览器。")
+        port = normalize_cdp_port(cdp_port)
+        browser_cookie = read_csdn_cookie_from_cdp(port)
+        analysis = analyze_csdn_cookie_input(browser_cookie)
+        status = csdn_browser_upload_status(port)
+        if not status.get("hasCsdnUpload"):
+            raise UserVisibleError("CSDN 自动浏览器已连接，但创作页上传组件还没加载。请确认新窗口停留在 CSDN 创作页，刷新后再试。")
+        if not analysis["ok"]:
+            raise UserVisibleError(str(analysis["message"]))
+        return jsonify(
+            {
+                "ok": True,
+                "analysis": analysis,
+                "message": "CSDN 自动浏览器可用：已读到完整登录态，且创作页上传组件已加载。",
+                "pageUrl": status.get("href"),
+            }
+        )
+    except UserVisibleError as exc:
+        return json_error(str(exc), 400)
+    except requests.RequestException as exc:
+        return json_error(f"连接 CSDN 自动浏览器失败：{exc}", 500)
+    except Exception as exc:  # noqa: BLE001
+        return json_error(f"测试 CSDN 自动浏览器失败：{exc}", 500)
 
 
 @app.get("/api/industry-prompts")
@@ -1318,6 +2284,17 @@ def lark_auth_status():
         return json_error(f"检查飞书账号失败：{exc}", 500)
 
 
+def current_lark_status_message() -> str:
+    try:
+        data = run_lark_json(["auth", "status", "--verify"], timeout=8)
+        status = safe_auth_status(data)
+        user_name = status.get("userName") or "未登录"
+        token_status = status.get("tokenStatus") or status.get("userStatus") or "-"
+        return f"当前 CLI 可用账号：{user_name}，状态：{token_status}。"
+    except Exception as exc:  # noqa: BLE001
+        return f"同时检查当前 CLI 账号失败：{exc}"
+
+
 @app.get("/api/lark/auth/list")
 def lark_auth_list():
     try:
@@ -1392,7 +2369,15 @@ def lark_auth_login_complete():
         device_code = (payload.get("deviceCode") or "").strip()
         if not device_code:
             raise UserVisibleError("请先发起授权，拿到 device_code 后再完成授权")
-        completed = run_lark_cli(["auth", "login", "--device-code", device_code], timeout=180)
+        try:
+            completed = run_lark_cli(["auth", "login", "--device-code", device_code], timeout=30)
+        except subprocess.TimeoutExpired as exc:
+            raise UserVisibleError(
+                "确认飞书授权等待超过 30 秒。请确认授权网页已经选择企业账号并点击允许；"
+                "如果设置页已经显示目标账号可用，就不需要重复点击确认。"
+                + "\n"
+                + current_lark_status_message()
+            ) from exc
         raw = (completed.stdout or "") + ("\n" + completed.stderr if completed.stderr else "")
         if completed.returncode != 0:
             raise UserVisibleError(raw.strip() or "飞书授权未完成")
@@ -1422,10 +2407,16 @@ def process_lark():
     try:
         payload = request.get_json(force=True, silent=False)
         job_dir = make_job_dir()
-        content, notices = fetch_lark_markdown(payload.get("docUrl") or "")
-        source = job_dir / "input" / "lark_source.md"
-        write_text(source, content)
-        return jsonify(process_source(job_dir, source, payload, "飞书文档", notices))
+        doc_url = payload.get("docUrl") or ""
+        if is_lark_file_url(doc_url):
+            source, notices = download_lark_file(doc_url, job_dir)
+            source_label = "飞书云空间文件"
+        else:
+            content, notices = fetch_lark_markdown(doc_url)
+            source = job_dir / "input" / "lark_source.md"
+            write_text(source, content)
+            source_label = "飞书文档"
+        return jsonify(process_source(job_dir, source, payload, source_label, notices))
     except UserVisibleError as exc:
         return json_error(str(exc), 400)
     except Exception as exc:  # noqa: BLE001
@@ -1441,12 +2432,18 @@ def process_lark_stream():
         job_dir = make_job_dir()
         job_id = job_id_from_dir(job_dir)
         emit(f"本地任务已创建：{job_id}", "job_created", {"jobId": job_id})
-        content, notices = fetch_lark_markdown(payload.get("docUrl") or "", emit)
-        source = job_dir / "input" / "lark_source.md"
-        write_text(source, content)
-        emit("飞书正文已保存到本地临时草稿。")
+        doc_url = payload.get("docUrl") or ""
+        if is_lark_file_url(doc_url):
+            source, notices = download_lark_file(doc_url, job_dir, emit)
+            source_label = "飞书云空间文件"
+        else:
+            content, notices = fetch_lark_markdown(doc_url, emit)
+            source = job_dir / "input" / "lark_source.md"
+            write_text(source, content)
+            emit("飞书正文已保存到本地临时草稿。")
+            source_label = "飞书文档"
         emit("开始识别图片并执行脱敏。")
-        return process_source(job_dir, source, payload, "飞书文档", notices, progress=emit)
+        return process_source(job_dir, source, payload, source_label, notices, progress=emit)
 
     return stream_task(task)
 
@@ -1559,11 +2556,35 @@ def job_csdn_prepare(job_id: str):
     try:
         job_dir = get_job_dir(job_id)
         payload = request.get_json(force=True, silent=False)
-        return jsonify(prepare_csdn_native(job_dir, payload.get("cookie") or ""))
+        return jsonify(prepare_csdn_native(job_dir, payload.get("cookie") or "", payload.get("cdpPort")))
     except UserVisibleError as exc:
         return json_error(str(exc), 400)
     except Exception as exc:  # noqa: BLE001
         return json_error(f"CSDN 原生图片准备失败：{exc}", 500)
+
+
+@app.post("/api/jobs/<job_id>/copy-safe")
+def job_copy_safe(job_id: str):
+    try:
+        job_dir = get_job_dir(job_id)
+        payload = request.get_json(force=True, silent=True) or {}
+        return jsonify(prepare_csdn_copy_payload(job_dir, payload.get("cdpPort")))
+    except UserVisibleError as exc:
+        return json_error(str(exc), 400)
+    except Exception as exc:  # noqa: BLE001
+        return json_error(f"复制安全草稿失败：{exc}", 500)
+
+
+@app.post("/api/jobs/<job_id>/csdn/copy")
+def job_csdn_copy(job_id: str):
+    try:
+        job_dir = get_job_dir(job_id)
+        payload = request.get_json(force=True, silent=True) or {}
+        return jsonify(prepare_csdn_editor_payload(job_dir, payload.get("cdpPort")))
+    except UserVisibleError as exc:
+        return json_error(str(exc), 400)
+    except Exception as exc:  # noqa: BLE001
+        return json_error(f"复制文章到 CSDN 失败：{exc}", 500)
 
 
 @app.get("/api/jobs/<job_id>/download")

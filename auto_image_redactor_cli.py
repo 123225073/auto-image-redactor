@@ -132,15 +132,20 @@ def cmd_process(args: argparse.Namespace) -> int:
 def cmd_lark(args: argparse.Namespace) -> int:
     job_dir = web_tool.make_job_dir()
     progress = make_progress(args.jsonl)
-    content, notices = web_tool.fetch_lark_markdown(args.url, progress)
-    source = job_dir / "input" / "lark_source.md"
-    source.parent.mkdir(parents=True, exist_ok=True)
-    web_tool.write_text(source, content)
+    if web_tool.is_lark_file_url(args.url):
+        source, notices = web_tool.download_lark_file(args.url, job_dir, progress)
+        source_label = "CLI Feishu/Lark Drive file"
+    else:
+        content, notices = web_tool.fetch_lark_markdown(args.url, progress)
+        source = job_dir / "input" / "lark_source.md"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        web_tool.write_text(source, content)
+        source_label = "CLI Feishu/Lark document"
     result = web_tool.process_source(
         job_dir,
         source,
         payload_from_args(args),
-        "CLI Feishu/Lark document",
+        source_label,
         notices=notices,
         progress=progress,
     )
@@ -194,7 +199,7 @@ def build_parser() -> argparse.ArgumentParser:
     process.set_defaults(func=cmd_process)
 
     lark = subparsers.add_parser("lark", help="读取飞书文档链接并脱敏")
-    lark.add_argument("url", help="飞书 docx/wiki 文档链接")
+    lark.add_argument("url", help="飞书 docx/wiki/file 链接；file 云空间文件需要 Drive 下载权限")
     add_processing_options(lark)
     lark.set_defaults(func=cmd_lark)
 

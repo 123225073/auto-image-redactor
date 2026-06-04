@@ -232,6 +232,9 @@
     button.amber { background: var(--amber); }
     button:disabled {
       opacity: .55;
+      cursor: not-allowed;
+    }
+    body.is-busy button:disabled {
       cursor: wait;
     }
     .drop {
@@ -304,6 +307,60 @@
       overflow-wrap: anywhere;
     }
     .auth-link a { color: #075985; font-weight: 900; }
+    .copy-snippet {
+      margin-top: 10px;
+      border: 1px solid #dce7f8;
+      background: #f7fbff;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .copy-snippet code {
+      display: block;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #20314c;
+    }
+    .guide-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .console-map {
+      margin-top: 10px;
+      border: 1px solid #dce7f8;
+      background: #101827;
+      color: #e5eefc;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+    }
+    .console-map-row {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .console-map-box {
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 6px;
+      padding: 8px;
+      background: rgba(255,255,255,.06);
+    }
+    .console-map-box.wrong {
+      border-color: #fca5a5;
+      color: #fecaca;
+      background: rgba(220, 38, 38, .18);
+    }
+    .console-map-box.right {
+      border-color: #86efac;
+      color: #dcfce7;
+      background: rgba(22, 163, 74, .16);
+    }
     .account-guide {
       margin-top: 10px;
       border: 1px solid #f3d59c;
@@ -319,6 +376,38 @@
       display: block;
       margin-bottom: 4px;
       font-size: 13px;
+    }
+    .csdn-curl-guide {
+      margin: 10px 0 12px;
+      border: 1px solid #bfe4d1;
+      background: linear-gradient(135deg, #f0fff7 0%, #f8fbff 72%);
+      border-radius: 8px;
+      padding: 12px;
+      color: #12442a;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .csdn-curl-guide strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #083d24;
+      font-size: 14px;
+    }
+    .csdn-curl-guide ol {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+    .csdn-curl-guide code {
+      border: 1px solid #cfe7dc;
+      background: rgba(255,255,255,.76);
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #15543a;
+    }
+    .csdn-curl-guide .warning-line {
+      margin-top: 8px;
+      color: #805300;
+      font-weight: 800;
     }
     .account-steps {
       display: grid;
@@ -965,6 +1054,24 @@
     .info-card .actions {
       justify-content: flex-end;
     }
+    .copy-fallback-card {
+      width: min(860px, 96vw);
+    }
+    .copy-fallback-card textarea {
+      min-height: 340px;
+      max-height: 58vh;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      resize: vertical;
+      margin-top: 10px;
+    }
+    .copy-fallback-card .hint {
+      margin: 4px 0 0;
+      color: var(--subtle);
+      font-size: 13px;
+      line-height: 1.6;
+    }
 
     @media (max-width: 1020px) {
       main { grid-template-columns: 1fr; }
@@ -1044,17 +1151,17 @@
           <strong>为什么网页里有两个飞书，但这里只看到一个？</strong>
           飞书网页的“切换账号”只影响浏览器；本工具读取文档时调用的是本机 lark-cli。当前 lark-cli 只拿到了被授权账号的令牌，所以要读取纯米集团文档，需要重新发起授权，并在授权页选择“纯米集团/周广源”那个账号。
           <div class="account-steps">
-            <div class="account-step"><b>1. 生成授权链接</b>点击“重新授权企业账号”。</div>
-            <div class="account-step"><b>2. 选择纯米账号</b>如果默认进了风沙，把链接复制到已登录纯米的浏览器或无痕窗口打开。</div>
-            <div class="account-step"><b>3. 回来确认</b>点“我已经完成授权”，再检查当前 CLI 授权账号。</div>
+            <div class="account-step"><b>1. 生成网页登录授权</b>点击“生成企业账号授权链接”。</div>
+            <div class="account-step"><b>2. 在网页里选周广源</b>如果默认进了风沙，把链接复制到已登录纯米的浏览器、另一个浏览器用户或无痕窗口打开。</div>
+            <div class="account-step"><b>3. 只在授权后确认</b>回到工具点“确认网页登录授权”。如果只是切换配置档，不需要点这个按钮。</div>
           </div>
         </div>
         <div id="larkAccountState" class="inline-state">尚未检查。这里显示的是 CLI 真正能读取文档的账号。</div>
         <div class="actions">
           <button class="secondary" id="checkLarkAccountBtn" type="button">检查当前 CLI 授权账号</button>
           <button class="secondary" id="listLarkUsersBtn" type="button">查看 CLI 已授权账号</button>
-          <button class="green" id="startLarkLoginBtn" type="button">重新授权企业账号</button>
-          <button class="secondary" id="completeLarkLoginBtn" type="button">我已经完成授权</button>
+          <button class="green" id="startLarkLoginBtn" type="button">生成企业账号授权链接</button>
+          <button class="secondary" id="completeLarkLoginBtn" type="button" disabled>确认网页登录授权</button>
           <button class="secondary" id="copyAuthLinkBtn" type="button" disabled>复制授权链接</button>
           <button class="secondary" id="openFeishuWebBtn" type="button">打开飞书网页</button>
           <button class="secondary" id="saveLarkBtn" type="button">保存飞书设置</button>
@@ -1062,7 +1169,7 @@
         <div id="authLinkBox" class="auth-link hidden"></div>
         <details class="advanced-box">
           <summary>高级：配置档和权限编号（通常不用展开）</summary>
-          <p class="hint">配置档不是普通飞书账号切换。只有你创建过多个 lark-cli 配置档，或报错提示缺权限编号时，才需要动这里。</p>
+          <p class="hint">配置档不是普通飞书账号切换。切换配置档后，工具会自动检查当前 CLI 账号；不要再点“确认网页登录授权”，那个按钮只给上方新生成的授权链接使用。</p>
           <div class="label-row"><label for="profileSelect">lark-cli 配置档</label><button class="info-dot" type="button" data-info-title="lark-cli 配置档" data-info="这是 lark-cli 的工作配置档，不等于飞书网页里的个人号/企业号。你现在看到的 cli_a95... 只是 CLI 应用配置，不是纯米账号入口。">!</button></div>
           <div class="row">
             <select id="profileSelect"><option value="">先读取配置档</option></select>
@@ -1078,7 +1185,7 @@
             <label><input class="auth-domain" type="checkbox" value="drive" checked> 云空间</label>
           </div>
           <div class="label-row"><label for="authScope">高级权限编号</label><button class="info-dot" type="button" data-info-title="高级权限编号" data-info="这是飞书接口权限编号。普通情况留空即可；只有飞书报错明确提示缺少某个权限编号时，再复制到这里。">!</button></div>
-          <input id="authScope" type="text" placeholder="一般留空；例如 docx:document:readonly">
+          <input id="authScope" type="text" placeholder="一般留空；云空间文件可填 drive:drive.metadata:readonly drive:file:download">
         </details>
       </section>
 
@@ -1109,17 +1216,27 @@
 
       <section class="settings-block">
         <h3><span class="section-index">四</span>CSDN 发布 <button class="info-dot" type="button" data-info-title="CSDN 发布" data-info="优先使用 CSDN 自己的图片上传通道，把本地脱敏后的图片上传成 CSDN 图片地址，再复制文章。这样不会依赖你自己的 COS 存储桶。">!</button></h3>
-        <div class="label-row"><label for="csdnCookie">CSDN Cookie（可选）</label><button class="info-dot" type="button" data-info-title="CSDN Cookie" data-info="如果你填写 CSDN 登录 Cookie，点击“复制富文本并打开 CSDN”时会先把图片上传到 CSDN 官方图片服务，再复制文章。你可以先点“打开 CSDN 登录页”，登录后点“尝试自动读取 Cookie”；如果浏览器加密拦截，再按下方手动引导复制。">!</button></div>
-        <textarea id="csdnCookie" placeholder="可选。填写后使用 CSDN 原生图片上传；不填写则仍可复制草稿，但 CSDN 可能无法自动转存本地图片。"></textarea>
-        <div class="actions">
-          <button class="secondary" id="openCsdnLoginBtn" type="button">打开 CSDN 登录页</button>
-          <button class="amber" id="readCsdnCookieBtn" type="button">尝试自动读取 Cookie</button>
-          <button class="green" id="saveCsdnBtn" type="button">保存 CSDN 设置</button>
+        <div class="csdn-curl-guide">
+          <strong>唯一方案：CSDN 自动登录浏览器</strong>
+          工具会打开一个专门用于 CSDN 的浏览器窗口。你只需要在这个窗口里登录一次，后续复制文章时会自动读取登录态、上传脱敏图片，并把文章写入 CSDN 编辑器。
+          <ol>
+            <li>点“打开 CSDN 自动浏览器”。</li>
+            <li>在新窗口完成 CSDN 登录，并停留在创作页。</li>
+            <li>回到本工具点“检查自动登录”。</li>
+            <li>处理文章后，直接点“复制文章并打开 CSDN”。</li>
+          </ol>
+          <div class="warning-line">登录态读取、图片上传、正文写入都会走这个自动浏览器。</div>
+          <div class="actions">
+            <button class="secondary" id="openCsdnDebugBrowserBtn" type="button">打开 CSDN 自动浏览器</button>
+            <button class="amber" id="readCsdnCookieCdpBtn" type="button">检查自动登录</button>
+            <button class="secondary" id="testCsdnCookieBtn" type="button">检查上传组件</button>
+          </div>
         </div>
-        <details class="advanced-box">
-          <summary>如果自动读取失败，点这里看获取方法</summary>
-          <p class="hint">推荐流程：1. 点“打开 CSDN 登录页”；2. 登录成功后回到本工具；3. 点“尝试自动读取 Cookie”。如果仍失败，可以在 CSDN 页面按 F12，进入 Console，输入 <code>document.cookie</code>，复制返回内容粘贴到上方。</p>
-        </details>
+        <input id="csdnDebugPort" type="hidden" value="9222">
+        <textarea id="csdnCookie" class="hidden"></textarea>
+        <div id="csdnCookiePreview" class="inline-state hidden"></div>
+        <select id="csdnBrowserSelect" class="hidden"><option value="chrome">Google Chrome</option></select>
+        <select id="csdnProfileSelect" class="hidden"><option value="">自动</option></select>
         <p class="hint">最终发布按钮仍然由你在 CSDN 页面人工确认。本工具不会自动公开发布。</p>
       </section>
     </form>
@@ -1148,7 +1265,7 @@
           <div class="flow-step">5 发布前确认</div>
         </div>
         <div class="doc-grid">
-          <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
+          <div class="doc-card"><strong>从哪里导入</strong><p>复制飞书 docx/wiki/file 链接，或上传 Word、PDF、Markdown、HTML、图片。工具会自动提取文章里的图片。</p></div>
           <div class="doc-card"><strong>敏感词怎么填</strong><p>多个词用中文逗号、英文逗号或换行隔开。默认已包含赛邦、乐土、纯米、xxx公司、xxx股份有限公司。物料编码、BOM 号、单据号、凭证号、订单号这类业务编号默认不打码。</p></div>
           <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
           <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
@@ -1176,8 +1293,8 @@
           <button class="source-tab" type="button" data-source-tab="upload">本地文件</button>
         </div>
         <div id="larkImportPane" class="import-pane">
-          <label for="docUrl">飞书文档链接</label>
-          <input id="docUrl" type="text" placeholder="粘贴 docx/wiki 链接，工具会自动调用本机 lark-cli">
+          <label for="docUrl">飞书链接</label>
+          <input id="docUrl" type="text" placeholder="粘贴 docx/wiki/file 链接；file 云空间文件需要 Drive 下载权限">
           <div class="actions">
             <button id="processLarkBtn">读取并脱敏</button>
             <button class="secondary" id="healthBtn">检查飞书 CLI</button>
@@ -1245,7 +1362,7 @@
         <textarea id="source" class="source hidden" readonly></textarea>
         <textarea id="report" class="source hidden" readonly></textarea>
         <div class="actions">
-          <button class="green" id="copyRichBtn" disabled>复制富文本并打开 CSDN</button>
+          <button class="green" id="copyRichBtn" disabled>复制文章并打开 CSDN</button>
           <button class="secondary" id="copyMdBtn" disabled>复制安全草稿</button>
           <a class="button-link secondary" id="downloadBtn" href="#" download>下载安全包</a>
         </div>
@@ -1274,6 +1391,19 @@
     </div>
   </div>
 
+  <div id="copyFallbackModal" class="info-modal" aria-hidden="true">
+    <div class="info-card copy-fallback-card">
+      <h3>浏览器没有自动写入剪贴板</h3>
+      <p id="copyFallbackReason" class="hint">请手动复制下面内容，然后粘贴到 CSDN 编辑器。</p>
+      <textarea id="copyFallbackText" readonly></textarea>
+      <div class="actions">
+        <button class="secondary" id="selectFallbackTextBtn" type="button">选中全文</button>
+        <button class="secondary" id="openCsdnFromFallbackBtn" type="button">打开 CSDN</button>
+        <button class="green" id="closeCopyFallbackBtn" type="button">我知道了</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
     const CACHE_KEY = "csdnSafeToolSession.v2";
@@ -1290,6 +1420,7 @@
       streamingJobId: "",
       streamingImages: [],
       streamingTotal: 0,
+      uiBusy: false,
       isProcessing: false,
       isPaused: false,
       selectedAudit: { index: null, source: "original" },
@@ -1330,6 +1461,9 @@
         modelManual: $("modelManual").value,
         modelOptions: Array.from($("modelSelect").options).map(option => option.value),
         csdnCookie: $("csdnCookie").value,
+        csdnBrowser: $("csdnBrowserSelect").value,
+        csdnProfile: $("csdnProfileSelect").value,
+        csdnDebugPort: $("csdnDebugPort").value,
         promptPath: $("promptPath").value,
         promptName: $("promptName").value,
         promptContent: $("promptContent").value,
@@ -1364,6 +1498,12 @@
       $("baseUrl").value = cache.baseUrl || "https://cpa.fengsha.online/v1";
       $("modelManual").value = cache.modelManual || "gpt-5.5";
       $("csdnCookie").value = cache.csdnCookie || "";
+      $("csdnBrowserSelect").value = cache.csdnBrowser || "chrome";
+      $("csdnDebugPort").value = cache.csdnDebugPort || "9222";
+      if (cache.csdnProfile) {
+        $("csdnProfileSelect").innerHTML = `<option value="">自动扫描全部</option><option value="${escapeHtml(cache.csdnProfile)}">${escapeHtml(cache.csdnProfile)}</option>`;
+        $("csdnProfileSelect").value = cache.csdnProfile;
+      }
       $("promptPath").value = cache.promptPath || "";
       $("promptName").value = cache.promptName || "";
       $("promptContent").value = cache.promptContent || "";
@@ -1387,6 +1527,7 @@
       state.larkDeviceCode = cache.larkDeviceCode || "";
       state.larkAuthUrl = cache.larkAuthUrl || "";
       if (state.larkAuthUrl) renderAuthLink(state.larkAuthUrl);
+      syncLarkAuthButtons();
       if (cache.activeHelpTab) state.activeHelpTab = cache.activeHelpTab;
       if (cache.selectedAudit) state.selectedAudit = cache.selectedAudit;
       state.logs = Array.isArray(cache.logs) ? cache.logs : [];
@@ -1433,6 +1574,11 @@
       $("modelSelect").innerHTML = `<option value="gpt-5.5">gpt-5.5</option>`;
       $("modelManual").value = "gpt-5.5";
       $("csdnCookie").value = "";
+      $("csdnCookiePreview").classList.add("hidden");
+      $("csdnCookiePreview").textContent = "";
+      $("csdnBrowserSelect").value = "chrome";
+      $("csdnDebugPort").value = "9222";
+      $("csdnProfileSelect").innerHTML = `<option value="">自动扫描全部</option>`;
       $("promptPath").value = "";
       $("promptName").value = "";
       $("promptContent").value = "";
@@ -1441,6 +1587,7 @@
       document.querySelectorAll(".auth-domain").forEach(item => item.checked = true);
       state.larkDeviceCode = "";
       state.larkAuthUrl = "";
+      syncLarkAuthButtons();
       $("authLinkBox").classList.add("hidden");
       $("authLinkBox").innerHTML = "";
       $("copyAuthLinkBtn").disabled = true;
@@ -1475,17 +1622,44 @@
       el.className = "settings-status show" + (type ? " " + type : "");
     }
 
+    function syncLarkAuthButtons() {
+      const copyBtn = $("copyAuthLinkBtn");
+      const completeBtn = $("completeLarkLoginBtn");
+      if (copyBtn) {
+        copyBtn.disabled = state.uiBusy || !state.larkAuthUrl;
+        copyBtn.title = state.larkAuthUrl ? "复制刚生成的网页登录授权链接" : "先生成企业账号授权链接";
+      }
+      if (completeBtn) {
+        completeBtn.disabled = state.uiBusy || !state.larkDeviceCode;
+        completeBtn.title = state.larkDeviceCode
+          ? "只在你已经打开授权链接并在飞书网页点了允许后使用"
+          : "没有待确认的网页登录授权；切换配置档后请直接检查当前 CLI 账号";
+      }
+    }
+
+    function clearPendingLarkAuth() {
+      state.larkDeviceCode = "";
+      state.larkAuthUrl = "";
+      $("copyAuthLinkBtn").disabled = true;
+      $("authLinkBox").classList.add("hidden");
+      $("authLinkBox").innerHTML = "";
+      syncLarkAuthButtons();
+      saveCache();
+    }
+
     function setBusy(isBusy) {
+      state.uiBusy = isBusy;
+      document.body.classList.toggle("is-busy", isBusy);
       [
         "processLarkBtn", "processUploadBtn", "healthBtn", "fetchModelsBtn", "testCpaBtn", "clearCacheBtn",
         "checkLarkAccountBtn", "listLarkUsersBtn", "listProfilesBtn", "useProfileBtn", "startLarkLoginBtn", "completeLarkLoginBtn",
         "loadPromptsBtn", "savePromptPathBtn", "savePromptBtn", "saveCpaBtn", "saveLarkBtn", "saveCsdnBtn",
-        "openCsdnLoginBtn", "readCsdnCookieBtn", "openFeishuWebBtn", "copyAuthLinkBtn", "refreshLlmGuideBtn", "copyLlmGuideBtn"
+        "openCsdnDebugBrowserBtn", "readCsdnCookieCdpBtn", "testCsdnCookieBtn", "openFeishuWebBtn", "copyAuthLinkBtn", "refreshLlmGuideBtn", "copyLlmGuideBtn"
       ].forEach(id => {
         const el = $(id);
         if (el) el.disabled = isBusy;
       });
-      if (!isBusy && $("copyAuthLinkBtn")) $("copyAuthLinkBtn").disabled = !state.larkAuthUrl;
+      syncLarkAuthButtons();
       ["copyRichBtn", "copyMdBtn"].forEach(id => {
         const el = $(id);
         if (el) el.disabled = isBusy || !state.result;
@@ -1580,6 +1754,71 @@
       $("infoModal").setAttribute("aria-hidden", "true");
     }
 
+    function openCopyFallback(text, reason = "") {
+      $("copyFallbackReason").textContent = reason || "请手动复制下面内容，然后粘贴到 CSDN 编辑器。";
+      $("copyFallbackText").value = text || "";
+      $("copyFallbackModal").classList.add("open");
+      $("copyFallbackModal").setAttribute("aria-hidden", "false");
+      window.setTimeout(() => {
+        $("copyFallbackText").focus();
+        $("copyFallbackText").select();
+      }, 60);
+    }
+
+    function closeCopyFallback() {
+      $("copyFallbackModal").classList.remove("open");
+      $("copyFallbackModal").setAttribute("aria-hidden", "true");
+    }
+
+    function selectFallbackText() {
+      $("copyFallbackText").focus();
+      $("copyFallbackText").select();
+    }
+
+    function openCsdnEditor() {
+      window.open(state.result?.editorUrl || "https://mp.csdn.net/mp_blog/creation/editor", "_blank", "noopener");
+    }
+
+    function openPreparingCsdnWindow() {
+      const win = window.open("", "_blank");
+      if (!win) return null;
+      try {
+        win.document.write(`
+          <title>正在准备 CSDN 草稿</title>
+          <body style="font-family: Microsoft YaHei, sans-serif; padding: 28px; color: #172033;">
+            <h2>正在准备 CSDN 草稿...</h2>
+            <p>工具正在复制文章内容。如果复制成功，这个页面会自动进入 CSDN 编辑器。</p>
+            <p style="color:#667085;">如果稍后没有跳转，请回到本地工具查看提示。</p>
+          </body>
+        `);
+        win.document.close();
+      } catch {
+        // Some browsers do not allow writing to the temporary tab; navigation still works.
+      }
+      return win;
+    }
+
+    function navigateCsdnWindow(win) {
+      const url = state.result?.editorUrl || "https://mp.csdn.net/mp_blog/creation/editor";
+      try {
+        if (win && !win.closed) {
+          win.location.href = url;
+          return;
+        }
+      } catch {
+        // Fall through to opening a new tab.
+      }
+      window.open(url, "_blank", "noopener");
+    }
+
+    function closePreparingWindow(win) {
+      try {
+        if (win && !win.closed) win.close();
+      } catch {
+        // Ignore browser restrictions.
+      }
+    }
+
     function switchHelpTab(name, opts = {}) {
       const target = name === "llm" ? "llm" : "guide";
       state.activeHelpTab = target;
@@ -1603,7 +1842,7 @@
     }
 
     async function copyLlmGuide() {
-      await navigator.clipboard.writeText($("llmGuideText").textContent || "");
+      await copyText($("llmGuideText").textContent || "");
       setStatus("LLM.TXT 内容已复制，可以发给 Agent 使用。", "ok");
       addLog("LLM.TXT 内容已复制。", "ok");
     }
@@ -1630,10 +1869,53 @@
     }
 
     async function apiJson(url, options = {}) {
-      const res = await fetch(url, options);
-      const data = await readJsonResponse(res);
-      if (!res.ok || !data.ok) throw new Error(data.error || "请求失败");
-      return data;
+      const { timeoutMs = 0, timeoutMessage = "请求等待超时，请稍后重试。", ...fetchOptions } = options;
+      let timer = null;
+      if (timeoutMs) {
+        const controller = new AbortController();
+        fetchOptions.signal = controller.signal;
+        timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      }
+      try {
+        const res = await fetch(url, fetchOptions);
+        const data = await readJsonResponse(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "请求失败");
+        return data;
+      } catch (err) {
+        if (err?.name === "AbortError") throw new Error(timeoutMessage);
+        throw err;
+      } finally {
+        if (timer) window.clearTimeout(timer);
+      }
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "readonly");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const copied = document.execCommand("copy");
+        textarea.remove();
+        if (!copied) throw new Error("浏览器拒绝写入剪贴板");
+      }
+    }
+
+    function selectElementText(el) {
+      if (!el) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
     }
 
     function saveSettings() {
@@ -1651,33 +1933,68 @@
       setSettingsStatus("飞书设置已保存。注意：真正能读哪个飞书账号，由 lark-cli 授权状态决定；请以“检查当前 CLI 授权账号”为准。", "ok");
     }
 
-    function saveCsdnSettings() {
-      saveCache();
-      const hasCookie = !!$("csdnCookie").value.trim();
-      setSettingsStatus(hasCookie
-        ? "CSDN Cookie 已保存。复制富文本时会优先把脱敏图片上传到 CSDN 官方图片服务。"
-        : "CSDN 设置已保存。当前未填写 Cookie，复制到 CSDN 后本地图片可能无法自动显示。",
-        hasCookie ? "ok" : "");
-    }
-
-    function openCsdnLogin() {
-      window.open("https://passport.csdn.net/login", "_blank", "noopener");
-      setSettingsStatus("已打开 CSDN 登录页。登录成功后回到这里点“尝试自动读取 Cookie”。", "ok");
-    }
-
-    async function readCsdnCookie() {
+    async function openCsdnDebugBrowser() {
+      const browser = $("csdnBrowserSelect").value || "chrome";
+      const port = $("csdnDebugPort").value.trim() || "9222";
       setBusy(true);
-      setSettingsStatus("正在尝试从本机 Chrome / Edge / Firefox 读取 CSDN Cookie...");
-      addLog("开始尝试自动读取 CSDN Cookie。");
+      setSettingsStatus("正在打开 CSDN 自动浏览器...");
+      addLog("开始打开 CSDN 自动浏览器。");
       try {
-        const data = await apiJson("/api/csdn/cookie");
-        $("csdnCookie").value = data.cookie || "";
+        const data = await apiJson("/api/csdn/debug-browser/open", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ browser, port })
+        });
+        $("csdnDebugPort").value = String(data.port || port);
+        setSettingsStatus(data.message || "已打开 CSDN 自动浏览器。登录后回来点击“检查自动登录”。", "ok");
+        addLog(`CSDN 自动浏览器已打开：${data.browserName || browser}，端口 ${data.port || port}${data.cdpHost ? `，调试地址 ${data.cdpHost}` : ""}。`, "ok");
         saveCache();
-        setSettingsStatus(data.message || "已读取并填入 CSDN Cookie。", "ok");
-        addLog("CSDN Cookie 自动读取成功。", "ok");
       } catch (err) {
-        setSettingsStatus(`自动读取失败：${err.message || err}\n可以先点“打开 CSDN 登录页”完成登录，再重试；仍失败时，展开下方手动引导复制 document.cookie。`, "error");
-        addLog(`CSDN Cookie 自动读取失败：${err.message || err}`, "error");
+        setSettingsStatus(`打开失败：${err.message || err}`, "error");
+        addLog(`打开 CSDN 自动浏览器失败：${err.message || err}`, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function readCsdnCookieFromCdp() {
+      const port = $("csdnDebugPort").value.trim() || "9222";
+      setBusy(true);
+      setSettingsStatus("正在检查 CSDN 自动登录状态...");
+      addLog("开始检查 CSDN 自动登录状态。");
+      try {
+        const data = await apiJson("/api/csdn/cookie/cdp", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ port })
+        });
+        $("csdnCookie").value = "";
+        saveCache();
+        setSettingsStatus(data.analysis?.ok ? "CSDN 自动登录可用。后续复制文章会自动上传图片并写入编辑器。" : (data.analysis?.message || data.message || "已完成检查。"), data.analysis?.ok ? "ok" : "error");
+        addLog("CSDN 自动登录检查完成。", data.analysis?.ok ? "ok" : "error");
+      } catch (err) {
+        setSettingsStatus(`检查失败：${err.message || err}\n请先点“打开 CSDN 自动浏览器”并完成登录。`, "error");
+        addLog(`CSDN 自动登录检查失败：${err.message || err}`, "error");
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function testCsdnCookie() {
+      const cdpPort = $("csdnDebugPort").value.trim() || "9222";
+      setBusy(true);
+      setSettingsStatus("正在检查 CSDN 自动浏览器和上传组件是否可用...");
+      try {
+        const data = await apiJson("/api/csdn/cookie/test", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ cdpPort })
+        });
+        setSettingsStatus(data.message || "CSDN 自动浏览器可用。", "ok");
+        addLog("CSDN 自动浏览器测试通过。", "ok");
+      } catch (err) {
+        setSettingsStatus(`CSDN 自动浏览器测试失败：${err.message || err}\n请先点“打开 CSDN 自动浏览器”，确认已经登录 CSDN 创作页。`, "error");
+        addLog(`CSDN 自动浏览器测试失败：${err.message || err}`, "error");
       } finally {
         setBusy(false);
       }
@@ -1704,9 +2021,11 @@
         renderLarkStatus(data.status || {});
         setSettingsStatus(`CLI 当前可用账号：${data.status?.userName || "已登录"}`, "ok");
         addLog(`CLI 授权账号检查完成：${data.status?.userName || "已登录"}`, "ok");
+        return data.status || {};
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
         addLog(err.message || String(err), "error");
+        return null;
       } finally {
         setBusy(false);
         saveCache();
@@ -1775,9 +2094,13 @@
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ profile })
         });
-        setSettingsStatus(data.message || "lark-cli 配置档已切换。", "ok");
+        clearPendingLarkAuth();
+        setSettingsStatus((data.message || "lark-cli 配置档已切换。") + " 正在自动检查当前 CLI 账号；不需要点击“确认网页登录授权”。", "ok");
         addLog(data.message || "lark-cli 配置档已切换。", "ok");
-        await checkLarkAccount();
+        const status = await checkLarkAccount();
+        if (status) {
+          setSettingsStatus("配置档已切换并完成账号检查。请以上方显示的“当前 CLI 授权账号”为准；如果已经是周广源，就可以直接读取飞书链接。", "ok");
+        }
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
         addLog(err.message || String(err), "error");
@@ -1792,10 +2115,12 @@
       if (!state.larkAuthUrl) {
         $("authLinkBox").classList.add("hidden");
         $("authLinkBox").innerHTML = "";
+        syncLarkAuthButtons();
         return;
       }
       $("authLinkBox").classList.remove("hidden");
       $("authLinkBox").innerHTML = `授权链接已生成：<br><a href="${escapeHtml(state.larkAuthUrl)}" target="_blank" rel="noopener">${escapeHtml(state.larkAuthUrl)}</a><br><br><strong>关键提醒：</strong>打开后必须选择能访问目标文档的账号。若默认进入“风沙”，请复制链接到已登录“纯米集团”的浏览器窗口、Edge/Chrome 另一个用户配置、或无痕窗口中打开。`;
+      syncLarkAuthButtons();
     }
 
     async function copyAuthLink() {
@@ -1803,7 +2128,7 @@
         setSettingsStatus("请先点击“重新授权企业账号”生成授权链接。", "error");
         return;
       }
-      await navigator.clipboard.writeText(state.larkAuthUrl);
+      await copyText(state.larkAuthUrl);
       setSettingsStatus("授权链接已复制。请把它粘贴到已登录纯米集团飞书的浏览器或无痕窗口里打开。", "ok");
       addLog("飞书授权链接已复制。", "ok");
     }
@@ -1817,7 +2142,7 @@
       const domains = Array.from(document.querySelectorAll(".auth-domain:checked")).map(item => item.value);
       const scope = $("authScope").value.trim();
       setBusy(true);
-      addLog("开始生成飞书企业账号授权链接。");
+      addLog("开始生成飞书企业账号网页登录授权链接。");
       setSettingsStatus("正在生成飞书授权链接...");
       try {
         const data = await apiJson("/api/lark/auth/login/start", {
@@ -1833,8 +2158,12 @@
           $("authLinkBox").classList.remove("hidden");
           $("authLinkBox").textContent = "授权已发起，但 CLI 没有返回链接。请查看运行进度。";
         }
-        setSettingsStatus("飞书授权链接已生成。请在授权页选择“纯米集团/周广源”账号，完成后回到这里点“我已经完成授权”。", "ok");
-        addLog("飞书授权链接已生成。", "ok");
+        if (state.larkDeviceCode) {
+          setSettingsStatus("飞书网页登录授权链接已生成。请在授权页选择“纯米集团/周广源”账号，完成后再点“确认网页登录授权”。", "ok");
+        } else {
+          setSettingsStatus("飞书授权动作已发起，但 CLI 没有返回可确认编号。授权完成后请直接点“检查当前 CLI 授权账号”。", "ok");
+        }
+        addLog("飞书网页登录授权链接已生成。", "ok");
         saveCache();
       } catch (err) {
         setSettingsStatus(err.message || String(err), "error");
@@ -1846,30 +2175,34 @@
 
     async function completeLarkLogin() {
       if (!state.larkDeviceCode) {
-        setSettingsStatus("请先点击“重新授权企业账号”生成授权链接。", "error");
+        setSettingsStatus("当前没有待确认的网页登录授权。这个按钮只在你刚刚点过“生成企业账号授权链接”后使用；如果你只是切换了高级配置档，请直接看“当前 CLI 授权账号”。正在帮你重新检查一次。", "error");
+        await checkLarkAccount();
         return;
       }
       setBusy(true);
       addLog("开始确认飞书授权结果。");
-      setSettingsStatus("正在确认飞书授权结果...");
+      setSettingsStatus("正在确认飞书授权结果，最多等待约 40 秒；如果授权页还没点允许，会给出明确提示，不会一直卡住。");
       try {
         const data = await apiJson("/api/lark/auth/login/complete", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ deviceCode: state.larkDeviceCode })
+          body: JSON.stringify({ deviceCode: state.larkDeviceCode }),
+          timeoutMs: 45000,
+          timeoutMessage: "确认授权等待超过 45 秒。请确认飞书授权网页已选择周广源并点击允许；如果设置里已经显示周广源可用，可以直接读取文档。"
         });
         setSettingsStatus(data.message || "飞书授权完成。", "ok");
         addLog(data.message || "飞书授权完成。", "ok");
-        state.larkDeviceCode = "";
-        state.larkAuthUrl = "";
-        $("copyAuthLinkBtn").disabled = true;
-        $("authLinkBox").classList.add("hidden");
-        $("authLinkBox").innerHTML = "";
+        clearPendingLarkAuth();
         await listLarkUsers();
         await checkLarkAccount();
       } catch (err) {
-        setSettingsStatus(err.message || String(err), "error");
-        addLog(err.message || String(err), "error");
+        const errorMessage = err.message || String(err);
+        setSettingsStatus(`${errorMessage}\n我会保留刚才的授权链接，你可以重新打开链接授权；也可以先检查当前 CLI 账号。`, "error");
+        addLog(errorMessage, "error");
+        const status = await checkLarkAccount();
+        if (status) {
+          setSettingsStatus(`${errorMessage}\n当前 CLI 可用账号：${status.userName || "已登录"}。如果这里已经是周广源，可以直接读取文档；如果还是风沙，请重新打开授权链接并选择企业账号。`, "error");
+        }
       } finally {
         setBusy(false);
         saveCache();
@@ -2356,23 +2689,54 @@
 
     async function copyPlain() {
       if (!state.result) return;
-      await navigator.clipboard.writeText(state.result.content);
-      setStatus("安全草稿已复制。", "ok");
+      const cdpPort = $("csdnDebugPort").value.trim() || "9222";
+      setBusy(true);
+      setStatus("正在准备并复制安全草稿...");
+      try {
+        const data = await apiJson(`/api/jobs/${state.result.jobId}/copy-safe`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ cdpPort }),
+          timeoutMs: 240000,
+          timeoutMessage: "安全草稿复制等待超时。"
+        });
+        renderResult(data, { restoreTab: state.activeTab || "audit" });
+        setStatus(`安全草稿已复制到系统剪贴板。${data.csdnUploads?.length ? `已自动上传 ${data.csdnUploads.length} 张图片到 CSDN。` : ""}`, "ok");
+        addLog("安全草稿已复制到系统剪贴板。", "ok");
+      } catch (err) {
+        setStatus(`安全草稿复制失败：${err.message || err}`, "error");
+        addLog(`安全草稿复制失败：${err.message || err}`, "error");
+      } finally {
+        setBusy(false);
+      }
     }
 
     function resultHasLocalImages(result) {
       return /(?:src=["']images\/|!\[[^\]]*\]\(images\/)/i.test(result?.content || "");
     }
 
+    function splitCsdnTitleAndBody(content) {
+      const text = content || "";
+      const match = text.match(/^\s*<title>(.*?)<\/title>\s*/i);
+      if (!match) return { title: "", body: text };
+      return {
+        title: (match[1] || "").trim(),
+        body: text.slice(match[0].length).replace(/^\s+/, "")
+      };
+    }
+
     async function prepareCsdnNativeIfPossible() {
       const cookie = $("csdnCookie").value.trim();
-      if (!state.result || !cookie || !resultHasLocalImages(state.result)) return state.result;
-      setStatus("正在把脱敏图片上传到 CSDN 官方图片服务...");
-      addLog("开始使用 CSDN 原生图片上传。");
+      const cdpPort = $("csdnDebugPort").value.trim() || "9222";
+      if (!state.result || (!cookie && !cdpPort) || !resultHasLocalImages(state.result)) return state.result;
+      setStatus("正在通过 CSDN 登录浏览器上传脱敏图片...");
+      addLog("开始使用 CSDN 登录浏览器上传图片。");
       const data = await apiJson(`/api/jobs/${state.result.jobId}/csdn/prepare`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ cookie })
+        body: JSON.stringify({ cookie, cdpPort }),
+        timeoutMs: 240000,
+        timeoutMessage: "CSDN 图片上传等待超时。正文仍可复制，图片请稍后重试上传。"
       });
       renderResult(data, { restoreTab: state.activeTab || "audit" });
       addLog(`CSDN 原生图片上传完成：${data.csdnUploads?.length || 0} 张。`, "ok");
@@ -2381,25 +2745,28 @@
 
     async function copyRichAndOpen() {
       if (!state.result) return;
+      const cdpPort = $("csdnDebugPort").value.trim() || "9222";
       setBusy(true);
       try {
-        const prepared = await prepareCsdnNativeIfPossible();
-        const htmlBlob = new Blob([prepared.clipboardHtml], { type: "text/html" });
-        const textBlob = new Blob([prepared.content], { type: "text/plain" });
-        await navigator.clipboard.write([new ClipboardItem({ "text/html": htmlBlob, "text/plain": textBlob })]);
-        if (!$("csdnCookie").value.trim() && resultHasLocalImages(prepared)) {
-          setStatus("已复制草稿并打开 CSDN。提示：未填写 CSDN Cookie 时，CSDN 可能无法自动转存本地图片；建议在设置里填写 Cookie 后再点一次。", "ok");
-        } else {
-          setStatus("已复制带 CSDN 图片地址的草稿，正在打开 CSDN 创作页。最终发布由你确认。", "ok");
-        }
+        setStatus("正在上传图片，并写入 CSDN 自动浏览器...");
+        const data = await apiJson(`/api/jobs/${state.result.jobId}/csdn/copy`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ cdpPort }),
+          timeoutMs: 240000,
+          timeoutMessage: "写入 CSDN 等待超时。请确认 CSDN 自动浏览器已经登录并停留在创作页。"
+        });
+        renderResult(data, { restoreTab: state.activeTab || "audit" });
+        const titleHint = data.title ? ` 标题已自动填入：${data.title}。` : "";
+        const method = data.csdnEditorWrite?.method ? `写入方式：${data.csdnEditorWrite.method}。` : "";
+        setStatus(`文章已写入 CSDN 自动浏览器。${titleHint}${method}最终发布仍由你在 CSDN 页面确认。`, "ok");
+        addLog(`文章已写入 CSDN 自动浏览器；${data.csdnUploads?.length || 0} 张图片已转成 CSDN 地址。`, "ok");
       } catch (err) {
-        await navigator.clipboard.writeText(state.result.content);
-        setStatus(`CSDN 原生图片准备失败，已先复制安全草稿文本：${err.message || err}`, "error");
-        addLog(`CSDN 原生图片准备失败：${err.message || err}`, "error");
+        setStatus(`写入 CSDN 失败：${err.message || err}`, "error");
+        addLog(`写入 CSDN 失败：${err.message || err}`, "error");
       } finally {
         setBusy(false);
       }
-      window.open(state.result.editorUrl || "https://editor.csdn.net/md/", "_blank", "noopener");
     }
 
     function switchImportTab(name, opts = {}) {
@@ -2441,11 +2808,14 @@
     $("settingsBtn").addEventListener("click", openSettings);
     $("saveCpaBtn").addEventListener("click", saveCpaSettings);
     $("saveLarkBtn").addEventListener("click", saveLarkSettings);
-    $("saveCsdnBtn").addEventListener("click", saveCsdnSettings);
-    $("openCsdnLoginBtn").addEventListener("click", openCsdnLogin);
-    $("readCsdnCookieBtn").addEventListener("click", readCsdnCookie);
+    $("openCsdnDebugBrowserBtn").addEventListener("click", openCsdnDebugBrowser);
+    $("readCsdnCookieCdpBtn").addEventListener("click", readCsdnCookieFromCdp);
+    $("testCsdnCookieBtn").addEventListener("click", testCsdnCookie);
     $("closeSettingsBtn").addEventListener("click", closeSettings);
     $("closeHelpBtn").addEventListener("click", closeHelp);
+    $("closeCopyFallbackBtn").addEventListener("click", closeCopyFallback);
+    $("selectFallbackTextBtn").addEventListener("click", selectFallbackText);
+    $("openCsdnFromFallbackBtn").addEventListener("click", openCsdnEditor);
     $("drawerBackdrop").addEventListener("click", closeDrawers);
     $("clearCacheBtn").addEventListener("click", clearSessionCache);
     $("pauseStreamBtn").addEventListener("click", toggleStreamPause);
@@ -2492,6 +2862,7 @@
       $("modelManual").value = $("modelSelect").value;
       saveCache();
     });
+    $("csdnCookie").addEventListener("input", saveCache);
     $("healthBtn").addEventListener("click", async () => {
       addLog("开始检查本机环境。");
       const res = await fetch("/api/health");

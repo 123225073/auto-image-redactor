@@ -4,6 +4,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.npm-cache/
+.playwright-cli/
+.uv-cache/
 .venv/
 venv/
 
@@ -14,6 +17,8 @@ test-results/
 web-tool.*.log
 *.log
 *.zip
+debug-browser-profiles/
+chrome-profile/
 
 # Local private configuration and prompts
 .env
@@ -21,6 +26,10 @@ web-tool.*.log
 industry_prompts/
 industry_prompts.json
 sensitive_terms.txt
+cookies.txt
+csdn_cookies*.txt
+csdn_cookie_reader.py
+prepare_csdn_native_admin.py
 
 # User documents and private samples
 *.doc
