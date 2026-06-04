@@ -55,6 +55,34 @@ start-web-tool.bat
 8. 点击“复制文章并打开 CSDN”，工具会上传图片并写入 CSDN 编辑器。
 9. 最终发布前，由用户在 CSDN 页面人工检查并确认。
 
+## 核心实现原理图
+
+下面 4 张图把工具最核心的原理讲清楚：飞书怎么读、图片怎么识别打码、CSDN 登录态怎么拿、整个工具怎么串起来。
+
+### 1. 工具整体实现原理
+
+![工具整体实现原理](static/assets/principle-overall.png)
+
+一句话理解：工具把文章、图片、登录态都留在本机处理，只把确认后的安全草稿写入 CSDN。
+
+### 2. 飞书 CLI 识别和读取链接原理
+
+![飞书 CLI 识别和读取链接原理](static/assets/principle-lark-cli.png)
+
+一句话理解：网页飞书账号不等于 `lark-cli` 当前授权账号；工具真正调用的是本机 CLI，再按 `docx/wiki/file` 类型走不同读取路径。
+
+### 3. 图片识别和打码原理
+
+![图片识别和打码原理](static/assets/principle-image-redaction.png)
+
+一句话理解：先用 OCR 找出图片里的文字和坐标，再通过敏感词、规则、SAP 过滤判断哪些区域需要打码，最后只替换图片里的命中区域。
+
+### 4. CSDN Cookie 获取与草稿写入原理
+
+![CSDN Cookie 获取与草稿写入原理](static/assets/principle-csdn-cookie.png)
+
+一句话理解：工具不是去硬读浏览器数据库，而是连接你主动打开的 CSDN 自动浏览器，通过 Chrome 调试协议读取当前登录态，再调用 CSDN 页面上传组件写入草稿。
+
 ## 飞书链接说明
 
 本工具通过本机 `lark-cli` 读取飞书内容，所以飞书网页里切换账号，不等于 CLI 已经切换账号。网页工具右上角“设置 → 飞书账号”里可以检查当前 CLI 账号并重新授权。

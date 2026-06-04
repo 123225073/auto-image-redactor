@@ -1,102 +1,181 @@
-# Auto Image Redactor - Agent Guide
+# Auto Image Redactor - Agent / 用户说明
 
-This project is a local-first image redaction assistant for publishing SOP articles to CSDN. It can read Feishu/Lark document links through `lark-cli`, accept local Markdown/HTML/Word/PDF/image files, OCR the embedded screenshots, redact sensitive business text, and rebuild a safe article package.
+这个文件是给未来 Agent 和用户一起看的操作说明。命令保持英文参数格式，其余内容优先使用中文说明；文末附一份英文速查，方便英文 Agent 理解。
 
-## Safety Rules For Agents
+## 中文主版：给用户和中文 Agent
 
-- Do not publish to CSDN automatically. The final publish action must be confirmed by the human user.
-- Do not commit or upload local runtime data: `runs/`, `output/`, `test-results/`, logs, private prompts, or `sensitive_terms.txt`.
-- Treat Feishu links, CSDN cookies, CPA API keys, company names, supplier names, customer names, screenshots, and generated run outputs as private.
-- Prefer the CLI below for automation. Use the web UI only when the user needs to visually inspect results.
-- For SAP screenshots, avoid redacting standard UI labels by themselves. Redact actual business values such as company names, suppliers, customers, accounts, tax IDs, phone numbers, email addresses, and bank accounts.
-- If recognition looks wrong, use `rerun-image` with a per-image instruction instead of blindly reprocessing the whole document.
+### 工具定位
 
-## Main Commands
+这是一个本地优先的图片脱敏与 CSDN 草稿助手。它可以读取飞书链接，也可以处理本地 Markdown、HTML、Word、PDF、图片文件；工具会识别文章截图里的敏感文字，生成脱敏后的安全文章、检查报告和可上传到 CSDN 的草稿。
 
-Install dependencies:
+核心边界：
+
+- 不自动点击 CSDN 的最终发布按钮。
+- 不把 CSDN Cookie、飞书链接、CPA API Key、公司名、供应商名、客户名、截图和运行结果提交到 GitHub。
+- 不上传本地运行目录：`runs/`、`output/`、`test-results/`、日志、私有提示词、`sensitive_terms.txt`。
+- SAP 截图要尽量保留标准按钮、菜单、页签、字段名；只打码真实业务值，例如公司、供应商、客户、账号、税号、手机号、邮箱、银行账号。
+- 如果某张图识别不准，优先用 `rerun-image` 单张重跑，不要盲目整篇重跑。
+
+### 核心命令
+
+安装依赖：
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-Start the web UI:
+启动网页工具：
 
 ```bash
 python auto_image_redactor_cli.py serve
 ```
 
-Check local dependencies:
+检查本机环境：
 
 ```bash
 python auto_image_redactor_cli.py health
 ```
 
-Process local files:
+处理本地文件：
 
 ```bash
 python auto_image_redactor_cli.py process article.md --terms "某某公司,某某供应商" --jsonl
 ```
 
-Process a Feishu/Lark link. `docx/wiki` links are read as documents; `file` links are downloaded from Drive first and require `drive:drive.metadata:readonly drive:file:download` user scopes:
+处理飞书链接。`docx/wiki` 会读取文档正文；`file` 会先从云空间下载文件，需要 `drive:drive.metadata:readonly drive:file:download` 用户权限：
 
 ```bash
 python auto_image_redactor_cli.py lark "https://example.feishu.cn/docx/..." --terms "某某公司,某某供应商" --jsonl
 ```
 
-Use CPA model judging:
+启用 CPA 模型辅助判断：
 
 ```bash
 python auto_image_redactor_cli.py process article.docx --use-cpa --api-key "$CPA_API_KEY" --model "gpt-5.5"
 ```
 
-Use an industry prompt file:
+使用行业提示词文件：
 
 ```bash
 python auto_image_redactor_cli.py process article.docx --use-cpa --industry-prompt-file prompts/sap.txt
 ```
 
-Rerun one image from the original screenshot:
+基于原图重跑某一张图：
 
 ```bash
 python auto_image_redactor_cli.py rerun-image <job_id> 3 --image-source original --instruction "只打码右侧真实供应商名称，不要打码 SAP 标准字段"
 ```
 
-Rerun one image from the current redacted image:
+基于当前已打码图继续检查某一张图：
 
 ```bash
 python auto_image_redactor_cli.py rerun-image <job_id> 3 --image-source masked --instruction "保留当前已打码区域，检查是否还有漏掉的客户名称"
 ```
 
-## CLI Output Contract
+### CLI 输出字段
 
-The CLI prints final JSON to stdout. With `--jsonl`, progress events are also printed as JSON Lines before the final result.
+CLI 默认输出最终 JSON。加 `--jsonl` 后，会先输出逐步进度，最后再输出最终结果。
 
-Important final JSON fields:
+常用字段：
 
-- `ok`: whether the command succeeded.
+- `ok`：命令是否成功。
+- `jobId`：本地任务 ID，对应 `runs/<jobId>`。
+- `outputPath`：安全文章路径。
+- `reportPath`：Markdown 图片检查报告。
+- `reportJsonPath`：结构化图片检查结果。
+- `zipPath`：可转移的安全压缩包。
+- `imageCount`：识别到的图片数量。
+- `maskedRegions`：总打码区域数量。
+- `images[].matches`：每张图命中的敏感文字列表。
+
+### 飞书链接处理原则
+
+- `docx`：直接读取文档正文。
+- `wiki`：先解析知识库节点，再读取真实文档正文。
+- `file`：先读取云空间文件信息，再下载到任务目录，最后按本地文件处理。
+- 网页飞书账号和 `lark-cli` 当前授权账号不是一回事；网页能打开，不代表 CLI 有权限。
+- 如果 `file` 链接提示缺权限，请在网页工具“设置 → 飞书账号 → 高级权限编号”填入：
+
+```text
+drive:drive.metadata:readonly drive:file:download
+```
+
+### CSDN 草稿处理原则
+
+- 推荐先点击“打开 CSDN 自动浏览器”，在新窗口正常登录 CSDN。
+- “检查自动登录”会连接这个自动浏览器，读取当前 CSDN 登录态。
+- “检查上传组件”会确认 CSDN 创作页的图片上传组件已经加载。
+- “复制文章并打开 CSDN”会上传脱敏图片，并把标题和正文写入 CSDN 编辑器。
+- 最终公开发布必须由用户在 CSDN 页面人工确认。
+
+### 项目文件说明
+
+- `static/index.html`：单页网页工具。
+- `web_tool.py`：Flask 服务、飞书读取、CSDN 自动浏览器、任务管理、上传转换、重跑接口。
+- `csdn_image_mosaic.py`：OCR、敏感判断、SAP 过滤、马赛克、报告生成、文章图片替换。
+- `auto_image_redactor_cli.py`：Agent 友好的命令行入口。
+- `scripts/generate_principle_images.py`：生成 README 和网页使用文档里的核心原理图。
+- `static/assets/principle-*.png`：核心功能原理图。
+- `sensitive_terms.example.txt`：安全示例词库。真实私有词库应放在被忽略的 `sensitive_terms.txt`。
+
+### 推荐 Agent 工作流
+
+1. 先运行 `python auto_image_redactor_cli.py health`。
+2. 根据来源选择 `process` 或 `lark`，并加 `--jsonl` 监听进度。
+3. 读取最终 JSON，重点检查 `reportJsonPath`。
+4. 如果某几张图有漏打码或误打码，使用 `rerun-image` 单张修正。
+5. 把网页地址或输出包交给用户做最终视觉确认。
+6. 用户确认后，才协助复制或打开 CSDN；不要替用户点击最终发布。
+
+---
+
+## English Quick Reference For Agents
+
+This project is a local-first image redaction assistant for CSDN publishing. It reads Feishu/Lark links through `lark-cli`, accepts local Markdown/HTML/Word/PDF/image files, OCRs embedded screenshots, redacts sensitive business text, and rebuilds a safe article package.
+
+Safety rules:
+
+- Never publish to CSDN automatically. The human user must click the final publish button.
+- Never commit or upload local runtime data: `runs/`, `output/`, `test-results/`, logs, private prompts, `sensitive_terms.txt`, cookies, API keys, or screenshots.
+- Treat Feishu links, CSDN cookies, CPA API keys, company names, supplier names, customer names, screenshots, and generated run outputs as private.
+- Prefer CLI automation. Use the web UI when visual inspection is required.
+- For SAP screenshots, preserve standard UI labels and redact actual business values.
+- If recognition is wrong, use `rerun-image` with a per-image instruction.
+
+Main commands:
+
+```bash
+python -m pip install -r requirements.txt
+python auto_image_redactor_cli.py serve
+python auto_image_redactor_cli.py health
+python auto_image_redactor_cli.py process article.md --terms "Company,Supplier" --jsonl
+python auto_image_redactor_cli.py lark "https://example.feishu.cn/docx/..." --terms "Company,Supplier" --jsonl
+python auto_image_redactor_cli.py rerun-image <job_id> 3 --image-source original --instruction "Redact only the real supplier name; keep SAP standard fields"
+```
+
+Output contract:
+
+- `ok`: success flag.
 - `jobId`: local run ID under `runs/<jobId>`.
 - `outputPath`: safe article path.
 - `reportPath`: Markdown report path.
 - `reportJsonPath`: structured image report.
 - `zipPath`: portable safe package.
 - `imageCount`: total images found.
-- `maskedRegions`: total redacted OCR regions.
+- `maskedRegions`: total redacted regions.
 - `images[].matches`: redacted text list for each image.
 
-## Project Map
+Feishu link handling:
 
-- `static/index.html`: single-page HTML UI.
-- `web_tool.py`: Flask web server, Feishu/CSDN helpers, job management, upload conversion, rerun APIs.
-- `csdn_image_mosaic.py`: OCR, sensitive-text matching, SAP label filtering, mosaic rendering, article image replacement.
-- `auto_image_redactor_cli.py`: Agent-friendly command line entrypoint.
-- `sensitive_terms.example.txt`: safe sample terms. Local private terms should live in ignored `sensitive_terms.txt`.
-- `LLM.TXT`: this guide.
+- `docx`: read document body.
+- `wiki`: resolve wiki node, then read document body.
+- `file`: inspect and download from Drive first, then process as a local file.
+- `/file/` links require user scopes: `drive:drive.metadata:readonly drive:file:download`.
 
-## Typical Agent Workflow
+CSDN handoff:
 
-1. Run `python auto_image_redactor_cli.py health`.
-2. Process input using `process` or `lark` with `--jsonl`.
-3. Read the final JSON and inspect `reportJsonPath`.
-4. If specific images are wrong, call `rerun-image`.
-5. Give the user the web UI URL or output package for visual confirmation.
-6. Only after user confirmation, help copy/open CSDN. Do not click final publish for the user.
+- Use the dedicated CSDN automatic browser.
+- Read login state through Chrome DevTools Protocol.
+- Upload images through the CSDN page upload component.
+- Write title/body into CKEditor or Markdown editor.
+- Stop at draft; do not publish.

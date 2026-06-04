@@ -900,7 +900,7 @@
       line-height: 1.5;
     }
     .help-drawer {
-      width: min(980px, 100vw);
+      width: min(1180px, 100vw);
     }
     .help-tabs {
       display: grid;
@@ -927,6 +927,40 @@
       display: block;
       cursor: zoom-in;
       margin-bottom: 16px;
+    }
+    .principle-gallery {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0 0 16px;
+    }
+    .principle-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: linear-gradient(180deg, #fff, #f7fbff);
+    }
+    .principle-card img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      border: 1px solid #d8e6fb;
+      border-radius: 8px;
+      display: block;
+      cursor: zoom-in;
+      background: #f8fbff;
+    }
+    .principle-card strong {
+      display: block;
+      margin: 9px 2px 4px;
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .principle-card p {
+      margin: 0 2px;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.55;
     }
     .doc-grid {
       display: grid;
@@ -1083,6 +1117,7 @@
       .row { grid-template-columns: 1fr; }
       .mini-grid { grid-template-columns: 1fr; }
       .doc-grid { grid-template-columns: 1fr; }
+      .principle-gallery { grid-template-columns: 1fr; }
       .flow-strip { grid-template-columns: 1fr; }
       .account-steps { grid-template-columns: 1fr; }
       .settings-grid { grid-template-columns: 1fr; }
@@ -1256,7 +1291,24 @@
         <button class="help-tab" type="button" data-help-tab="llm">Agent / LLM.TXT</button>
       </div>
       <div id="helpGuidePane" class="help-pane">
-        <img id="helpHeroImg" class="help-hero" src="/static/assets/help-privacy-flow.png" alt="飞书文档和本地文件经过 OCR 脱敏后生成 CSDN 安全草稿的流程示意图">
+        <img id="helpHeroImg" class="help-hero" src="/static/assets/principle-overall.png" data-title="工具整体实现原理" alt="飞书、Word、PDF 一键转 CSDN 安全草稿的整体实现原理图">
+        <div class="principle-gallery" aria-label="核心实现原理图">
+          <div class="principle-card">
+            <img class="principle-img" src="/static/assets/principle-lark-cli.png" data-title="飞书 CLI 识别和读取链接原理" alt="飞书 CLI 识别和读取链接原理图">
+            <strong>飞书 CLI 怎么读链接</strong>
+            <p>按 docx、wiki、file 三种链接分流，并说明网页账号和 CLI 授权账号为什么会不一致。</p>
+          </div>
+          <div class="principle-card">
+            <img class="principle-img" src="/static/assets/principle-image-redaction.png" data-title="图片识别、判断与打码原理" alt="图片识别、判断与打码原理图">
+            <strong>图片怎么识别和打码</strong>
+            <p>OCR 找字和坐标，再用敏感规则、SAP 过滤、马赛克替换形成安全图片。</p>
+          </div>
+          <div class="principle-card">
+            <img class="principle-img" src="/static/assets/principle-csdn-cookie.png" data-title="CSDN Cookie 获取与草稿写入原理" alt="CSDN Cookie 获取与草稿写入原理图">
+            <strong>CSDN 登录态怎么获取</strong>
+            <p>连接用户主动打开的 CSDN 自动浏览器，读取登录态后调用页面上传组件写入草稿。</p>
+          </div>
+        </div>
         <div class="flow-strip">
           <div class="flow-step">1 导入文章</div>
           <div class="flow-step">2 填敏感词</div>
@@ -1270,7 +1322,7 @@
           <div class="doc-card"><strong>模糊还是精确</strong><p>多数情况选“模糊包含”：OCR 有轻微错字也尽量命中。只有必须完整出现时才用“精确短语”。</p></div>
           <div class="doc-card"><strong>右侧怎么看</strong><p>“图片检查”会列出图片总数、命中图片、打码区域。点击任意图片可放大核对细节。</p></div>
           <div class="doc-card"><strong>什么时候用 CPA</strong><p>本地规则不确定时，在右上角“设置”里打开 CPA。它只发送 OCR 文字行，不上传整张截图。</p></div>
-          <div class="doc-card"><strong>怎么发到 CSDN</strong><p>确认图片检查和预览无误后，点击“复制富文本并打开 CSDN”。如已在设置里填写 CSDN Cookie，工具会先走 CSDN 原生图片上传，最终发布按钮仍由你人工确认。</p></div>
+          <div class="doc-card"><strong>怎么发到 CSDN</strong><p>先打开 CSDN 自动浏览器并完成登录，再点“复制文章并打开 CSDN”。工具会自动上传脱敏图片并写入草稿，最终发布按钮仍由你人工确认。</p></div>
         </div>
       </div>
       <div id="helpLlmPane" class="help-pane hidden">
@@ -2850,7 +2902,10 @@
         rerunImage(button.dataset.index, input?.value || "");
       }
     });
-    $("helpHeroImg").addEventListener("click", () => openLightbox($("helpHeroImg").src, "工具使用流程图"));
+    $("helpHeroImg").addEventListener("click", () => openLightbox($("helpHeroImg").src, $("helpHeroImg").dataset.title || "工具使用流程图"));
+    document.querySelectorAll(".principle-img").forEach(img => {
+      img.addEventListener("click", () => openLightbox(img.src, img.dataset.title || img.alt || "核心实现原理图"));
+    });
     document.querySelectorAll(".info-dot").forEach(btn => {
       btn.addEventListener("mouseenter", () => btn.title = btn.dataset.info || "");
       btn.addEventListener("click", () => openInfo(btn.dataset.infoTitle || "说明", btn.dataset.info || ""));
